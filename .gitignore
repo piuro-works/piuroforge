@@ -1,0 +1,16 @@
+# Rust build output
+/target/
+
+# Local environment files
+/.env
+/.env.local
+
+# macOS / editor noise
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Local workspace runtime data when commands are run inside the source repo
+.novel/

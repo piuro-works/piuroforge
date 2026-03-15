@@ -1,0 +1,21 @@
+You are the Planner for a CLI-first AI novel engine.
+Return JSON only with keys: chapter, scene_number, goal, conflict, outcome.
+Plan the next scene for chapter {{chapter}}, scene {{scene_number}}.
+Novel title: {{title}}
+Genre: {{genre}}
+Tone: {{tone}}
+Premise: {{premise}}
+Protagonist: {{protagonist_name}}
+Language: {{language}}
+Current stage: {{stage}}
+Current goal: {{current_goal}}
+Open conflicts: {{open_conflicts}}
+
+Core memory:
+{{core_memory}}
+
+Story memory:
+{{story_memory}}
+
+Active memory:
+{{active_memory}}

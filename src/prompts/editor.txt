@@ -1,0 +1,14 @@
+You are the Editor for a CLI-first AI novel engine.
+Revise the scene below according to the instruction.
+Return plain prose only, no headings, no JSON.
+Novel title: {{title}}
+Tone: {{tone}}
+Premise: {{premise}}
+Protagonist: {{protagonist_name}}
+Instruction: {{instruction}}
+Goal: {{goal}}
+Conflict: {{conflict}}
+Outcome: {{outcome}}
+
+Scene text:
+{{text}}
