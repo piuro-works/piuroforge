@@ -285,7 +285,7 @@ impl NovelEngine {
 
         let memory = self.memory_manager.load_bundle()?;
         let prompt = format!(
-            "You are expanding the world bible for an AI novel engine.\n\
+            "You are expanding the world bible for HeeForge, a CLI-first AI novel engine.\n\
 Return plain markdown only with one new section that deepens setting, factions, or rules.\n\n\
 Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
             core = memory.core_memory,

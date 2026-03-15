@@ -68,9 +68,11 @@ impl Config {
             scenes_dir,
             chapters_dir,
             logs_dir,
-            allow_dummy_fallback: env_flag("NOVEL_ENGINE_ALLOW_DUMMY")
+            allow_dummy_fallback: env_flag("HEEFORGE_ALLOW_DUMMY")
+                .or_else(|| env_flag("NOVEL_ENGINE_ALLOW_DUMMY"))
                 .unwrap_or(global_settings.allow_dummy_fallback),
-            codex_command: env::var("NOVEL_ENGINE_CODEX_CMD")
+            codex_command: env::var("HEEFORGE_CODEX_CMD")
+                .or_else(|_| env::var("NOVEL_ENGINE_CODEX_CMD"))
                 .unwrap_or_else(|_| global_settings.codex_command.clone()),
             global_settings,
             novel_settings,
@@ -82,7 +84,7 @@ impl Config {
             .file_name()
             .and_then(|value| value.to_str())
             .filter(|value| !value.is_empty())
-            .unwrap_or("novel-workspace")
+            .unwrap_or("heeforge-workspace")
             .to_string()
     }
 
@@ -231,7 +233,7 @@ fn default_title_from_path(path: &Path) -> String {
         .file_name()
         .and_then(|value| value.to_str())
         .filter(|value| !value.is_empty())
-        .unwrap_or("novel-workspace");
+        .unwrap_or("heeforge-workspace");
 
     raw.split(['-', '_', ' '])
         .filter(|segment| !segment.is_empty())

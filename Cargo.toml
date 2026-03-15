@@ -1,10 +1,10 @@
 [package]
-name = "novel_engine"
+name = "heeforge"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "novel"
+name = "heeforge"
 path = "src/main.rs"
 
 [dependencies]

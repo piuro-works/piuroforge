@@ -1,5 +1,5 @@
 use anyhow::Result;
-use novel_engine::{Config, NovelEngine};
+use heeforge::{Config, NovelEngine};
 use serde_json::Value;
 use std::process::Command;
 use tempfile::tempdir;
@@ -14,7 +14,7 @@ fn help_mentions_json_output_and_examples() -> Result<()> {
     assert!(stdout.contains("--format"));
     assert!(stdout.contains("Use `json` for Codex CLI"));
     assert!(stdout.contains("Quickstart:"));
-    assert!(stdout.contains("novel --workspace ~/novels/my-book --format json status"));
+    assert!(stdout.contains("heeforge --workspace ~/novels/my-book --format json status"));
 
     Ok(())
 }
@@ -105,5 +105,5 @@ fn ready_engine(
 }
 
 fn novel_bin() -> &'static str {
-    env!("CARGO_BIN_EXE_novel")
+    env!("CARGO_BIN_EXE_heeforge")
 }

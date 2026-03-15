@@ -219,8 +219,10 @@ impl ErrorOutput {
                 remediation: vec![
                     "Generate a scene before running review.".to_string(),
                     workspace
-                        .map(|path| format!("Run: novel --workspace {} next-scene", path.display()))
-                        .unwrap_or_else(|| "Run: novel next-scene".to_string()),
+                        .map(|path| {
+                            format!("Run: heeforge --workspace {} next-scene", path.display())
+                        })
+                        .unwrap_or_else(|| "Run: heeforge next-scene".to_string()),
                 ],
                 example_command: Some(example_for("next-scene", workspace)),
                 details: vec![],
@@ -337,7 +339,7 @@ pub fn emit_error(output: &ErrorOutput, format: OutputFormat) -> Result<()> {
 
 fn example_for(command: &str, workspace: Option<&Path>) -> String {
     match workspace {
-        Some(path) => format!("novel --workspace {} {}", path.display(), command),
-        None => format!("novel {}", command),
+        Some(path) => format!("heeforge --workspace {} {}", path.display(), command),
+        None => format!("heeforge {}", command),
     }
 }

@@ -1,10 +1,10 @@
-# Novel Engine MVP
+# HeeForge MVP
 
-Rust 기반 CLI-first AI 소설 생성 엔진 MVP다. 웹 UI 없이 `novel` 명령만으로 scene 생성, 리뷰, 수정, 승인, 상태 확인을 수행한다.
+Rust 기반 CLI-first AI 소설 생성 엔진 MVP다. 웹 UI 없이 `heeforge` 명령만으로 scene 생성, 리뷰, 수정, 승인, 상태 확인을 수행한다.
 
 LLM 호출은 직접 OpenAI API 키/OAuth를 다루지 않고, 사용자가 미리 로그인한 `codex` CLI subprocess만 사용한다. 다만 현재 MVP와 테스트를 위해 `codex`가 없거나 로그인되지 않은 경우 dummy fallback을 기본 허용한다.
 
-CLI UX는 두 가지 출력 모드를 제공한다.
+HeeForge CLI UX는 두 가지 출력 모드를 제공한다.
 
 - 기본 `text`: 사람이 읽기 쉬운 요약, 경로, 다음 추천 명령 출력
 - `--format json`: Codex CLI, OpenClaw, 기타 LLM 에이전트가 안정적으로 해석할 수 있는 구조화 출력
@@ -50,7 +50,7 @@ cargo build --release
 실행 파일:
 
 ```bash
-./target/release/novel
+./target/release/heeforge
 ```
 
 ## Release 배포
@@ -60,29 +60,29 @@ release 바이너리 배포 기준 권장 절차:
 ```bash
 cargo build --release
 mkdir -p dist
-cp target/release/novel dist/novel
+cp target/release/heeforge dist/heeforge
 ```
 
 사용자 머신 설치 예시:
 
 ```bash
-install -m 755 dist/novel /usr/local/bin/novel
-novel init ~/novels/my-first-novel
+install -m 755 dist/heeforge /usr/local/bin/heeforge
+heeforge init ~/novels/my-first-novel
 ```
 
 설치 직후 도움말 확인:
 
 ```bash
-novel --help
-novel next-scene --help
+heeforge --help
+heeforge next-scene --help
 ```
 
 배포 전 최소 확인:
 
 - `cargo test`
-- `./target/release/novel init <workspace>`
-- `./target/release/novel --workspace <workspace> next-scene`
-- `./target/release/novel --workspace <workspace> --format json status`
+- `./target/release/heeforge init <workspace>`
+- `./target/release/heeforge --workspace <workspace> next-scene`
+- `./target/release/heeforge --workspace <workspace> --format json status`
 - `codex login` 이후 실제 codex 경로 검증
 
 ## 사용법
@@ -90,13 +90,13 @@ novel next-scene --help
 설치된 바이너리 기준으로 새 워크스페이스 생성:
 
 ```bash
-novel init ~/novels/my-first-novel
+heeforge init ~/novels/my-first-novel
 ```
 
 `init`은 누락된 필수값을 인터랙티브하게 질문한다. 자동화가 필요하면 flag로 넘기거나 `--no-input`을 쓸 수 있다.
 
 ```bash
-novel init ~/novels/my-first-novel \
+heeforge init ~/novels/my-first-novel \
   --title "기억 편집자" \
   --genre "Mystery" \
   --tone "Tense, atmospheric" \
@@ -114,7 +114,7 @@ git add .
 git commit -m "Initialize novel workspace"
 ```
 
-`novel init`은 워크스페이스용 `.gitignore`를 생성해서 엔진 내부 상태 파일만 제외하고, scene/chapter/story memory 같은 실제 소설 산출물은 Git에 포함할 수 있게 준비한다.
+`heeforge init`은 워크스페이스용 `.gitignore`를 생성해서 엔진 내부 상태 파일만 제외하고, scene/chapter/story memory 같은 실제 소설 산출물은 Git에 포함할 수 있게 준비한다.
 처음 실행 시 전역 설정 파일 `~/.config/heeforge/config.toml`도 없으면 기본값으로 생성된다.
 필수값이 비어 있는 상태로 `init --no-input`을 수행한 경우 워크스페이스는 생성되지만 `next-scene` 전에 `novel.toml`을 채워야 한다.
 
@@ -122,28 +122,28 @@ git commit -m "Initialize novel workspace"
 
 ```bash
 cd ~/novels/my-first-novel
-novel status
-novel next-scene
-novel review
-novel rewrite scene_001_001 --instruction "대사를 더 날카롭게"
-novel approve scene_001_001
-novel next-chapter
-novel expand-world
-novel memory
-novel show scene_001_001
+heeforge status
+heeforge next-scene
+heeforge review
+heeforge rewrite scene_001_001 --instruction "대사를 더 날카롭게"
+heeforge approve scene_001_001
+heeforge next-chapter
+heeforge expand-world
+heeforge memory
+heeforge show scene_001_001
 ```
 
 현재 디렉터리가 워크스페이스가 아니거나 다른 위치에서 실행 중이면 `--workspace`로 명시할 수 있다.
 
 ```bash
-novel --workspace ~/novels/my-first-novel status
+heeforge --workspace ~/novels/my-first-novel status
 ```
 
 LLM/자동화 연동 시에는 `--format json`을 권장한다.
 
 ```bash
-novel --workspace ~/novels/my-first-novel --format json status
-novel --workspace ~/novels/my-first-novel --format json next-scene
+heeforge --workspace ~/novels/my-first-novel --format json status
+heeforge --workspace ~/novels/my-first-novel --format json next-scene
 ```
 
 `--format json`에서 `init`을 실행하면 interactive prompt를 기다리지 않도록 자동으로 non-interactive 모드로 동작한다. 필요한 필드는 flag 또는 `novel.toml` 편집으로 채운다.
@@ -168,10 +168,10 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 
 `.env.example` 참고.
 
-- `NOVEL_ENGINE_CODEX_CMD`: 기본값 `codex`
-- `NOVEL_ENGINE_ALLOW_DUMMY`: 기본값 `true`
+- `HEEFORGE_CODEX_CMD`: 기본값 `codex`
+- `HEEFORGE_ALLOW_DUMMY`: 기본값 `true`
 
-`NOVEL_ENGINE_ALLOW_DUMMY=false`로 두면 codex CLI가 없거나 로그인되지 않았을 때 명확한 에러를 반환한다.
+`HEEFORGE_ALLOW_DUMMY=false`로 두면 codex CLI가 없거나 로그인되지 않았을 때 명확한 에러를 반환한다.
 환경 변수 우선순위는 전역 설정 파일보다 높다.
 
 ## 현재 MVP 범위

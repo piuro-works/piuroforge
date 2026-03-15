@@ -13,7 +13,7 @@ use crate::engine::NovelEngine;
 
 fn workspace_command(engine: &NovelEngine, args: &str) -> String {
     format!(
-        "novel --workspace {} {}",
+        "heeforge --workspace {} {}",
         engine.workspace_dir().display(),
         args
     )

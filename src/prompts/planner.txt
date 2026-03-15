@@ -1,4 +1,4 @@
-You are the Planner for a CLI-first AI novel engine.
+You are the Planner for HeeForge, a CLI-first AI novel engine.
 Return JSON only with keys: chapter, scene_number, goal, conflict, outcome.
 Plan the next scene for chapter {{chapter}}, scene {{scene_number}}.
 Novel title: {{title}}

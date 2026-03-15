@@ -95,10 +95,10 @@ pub struct WorkspaceManifest {
 impl Default for WorkspaceManifest {
     fn default() -> Self {
         Self {
-            kind: "novel-engine-workspace".to_string(),
+            kind: "heeforge-workspace".to_string(),
             version: 1,
-            name: "novel-workspace".to_string(),
-            created_by: "heeforge/novel_engine".to_string(),
+            name: "heeforge-workspace".to_string(),
+            created_by: "heeforge".to_string(),
             engine_version: env!("CARGO_PKG_VERSION").to_string(),
             workspace_config: "novel.toml".to_string(),
         }

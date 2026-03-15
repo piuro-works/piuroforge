@@ -3,89 +3,89 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::process;
 
-use novel_engine::config::{WORKSPACE_DIR_NAME, WORKSPACE_MANIFEST_FILE};
-use novel_engine::output::{emit_command, emit_error, CommandOutput, ErrorOutput, OutputFormat};
-use novel_engine::{commands, Config, NovelEngine};
+use heeforge::config::{WORKSPACE_DIR_NAME, WORKSPACE_MANIFEST_FILE};
+use heeforge::output::{emit_command, emit_error, CommandOutput, ErrorOutput, OutputFormat};
+use heeforge::{commands, Config, NovelEngine};
 
 const CLI_AFTER_HELP: &str = "\
 Quickstart:
-  novel init ~/novels/my-book
+  heeforge init ~/novels/my-book
   cd ~/novels/my-book
-  novel next-scene
-  novel review
+  heeforge next-scene
+  heeforge review
 
 Automation:
-  novel --workspace ~/novels/my-book --format json status
-  novel --workspace ~/novels/my-book --format json next-scene
+  heeforge --workspace ~/novels/my-book --format json status
+  heeforge --workspace ~/novels/my-book --format json next-scene
 ";
 
 const INIT_AFTER_HELP: &str = "\
 Examples:
-  novel init ~/novels/my-book
-  novel init ~/novels/my-book --title \"기억 편집자\" --genre Mystery --tone \"Tense\" --premise \"...\" --protagonist \"윤서\" --language ko
-  novel --format json init ~/novels/my-book --no-input
+  heeforge init ~/novels/my-book
+  heeforge init ~/novels/my-book --title \"기억 편집자\" --genre Mystery --tone \"Tense\" --premise \"...\" --protagonist \"윤서\" --language ko
+  heeforge --format json init ~/novels/my-book --no-input
 ";
 
 const STATUS_AFTER_HELP: &str = "\
 Examples:
-  novel status
-  novel --workspace ~/novels/my-book --format json status
+  heeforge status
+  heeforge --workspace ~/novels/my-book --format json status
 ";
 
 const NEXT_SCENE_AFTER_HELP: &str = "\
 Examples:
-  novel next-scene
-  novel --workspace ~/novels/my-book --format json next-scene
+  heeforge next-scene
+  heeforge --workspace ~/novels/my-book --format json next-scene
 ";
 
 const REVIEW_AFTER_HELP: &str = "\
 Examples:
-  novel review
-  novel --workspace ~/novels/my-book --format json review
+  heeforge review
+  heeforge --workspace ~/novels/my-book --format json review
 ";
 
 const REWRITE_AFTER_HELP: &str = "\
 Examples:
-  novel rewrite scene_001_001 --instruction \"대사를 더 날카롭게\"
-  novel --workspace ~/novels/my-book --format json rewrite scene_001_001 --instruction \"Compress repeated exposition\"
+  heeforge rewrite scene_001_001 --instruction \"대사를 더 날카롭게\"
+  heeforge --workspace ~/novels/my-book --format json rewrite scene_001_001 --instruction \"Compress repeated exposition\"
 ";
 
 const APPROVE_AFTER_HELP: &str = "\
 Examples:
-  novel approve scene_001_001
-  novel --workspace ~/novels/my-book --format json approve scene_001_001
+  heeforge approve scene_001_001
+  heeforge --workspace ~/novels/my-book --format json approve scene_001_001
 ";
 
 const NEXT_CHAPTER_AFTER_HELP: &str = "\
 Examples:
-  novel next-chapter
-  novel --workspace ~/novels/my-book --format json next-chapter
+  heeforge next-chapter
+  heeforge --workspace ~/novels/my-book --format json next-chapter
 ";
 
 const EXPAND_WORLD_AFTER_HELP: &str = "\
 Examples:
-  novel expand-world
-  novel --workspace ~/novels/my-book --format json expand-world
+  heeforge expand-world
+  heeforge --workspace ~/novels/my-book --format json expand-world
 ";
 
 const MEMORY_AFTER_HELP: &str = "\
 Examples:
-  novel memory
-  novel --workspace ~/novels/my-book --format json memory
+  heeforge memory
+  heeforge --workspace ~/novels/my-book --format json memory
 ";
 
 const SHOW_AFTER_HELP: &str = "\
 Examples:
-  novel show scene_001_001
-  novel --workspace ~/novels/my-book --format json show scene_001_001
+  heeforge show scene_001_001
+  heeforge --workspace ~/novels/my-book --format json show scene_001_001
 ";
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "novel",
+    name = "heeforge",
     version,
-    about = "CLI-first AI novel engine for one workspace = one novel.",
-    long_about = "Create one novel workspace, then generate, review, rewrite, approve, and compile scenes from the terminal. Use `--format json` when another LLM agent needs stable, machine-readable output.",
+    about = "HeeForge CLI novel engine for one workspace = one novel.",
+    long_about = "HeeForge creates one novel workspace, then generates, reviews, rewrites, approves, and compiles scenes from the terminal. Use `--format json` when another LLM agent needs stable, machine-readable output.",
     after_long_help = CLI_AFTER_HELP
 )]
 struct Cli {

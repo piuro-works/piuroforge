@@ -2,7 +2,7 @@
 
 ## Purpose
 
-이 프로젝트는 Rust 기반 CLI-first AI 소설 엔진 MVP다. 모든 변경은 웹 UI가 아니라 CLI 워크플로를 우선해야 한다.
+이 프로젝트는 Rust 기반 CLI-first AI 소설 엔진 MVP다. CLI 실행 이름은 `heeforge`이며, 모든 변경은 웹 UI가 아니라 CLI 워크플로를 우선해야 한다.
 
 ## Hard Constraints
 

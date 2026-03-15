@@ -1,7 +1,7 @@
 use anyhow::Result;
-use novel_engine::models::Scene;
-use novel_engine::utils::markdown::render_scene;
-use novel_engine::{Config, NovelEngine};
+use heeforge::models::Scene;
+use heeforge::utils::markdown::render_scene;
+use heeforge::{Config, NovelEngine};
 use tempfile::tempdir;
 
 #[test]
