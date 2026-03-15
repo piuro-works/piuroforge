@@ -29,6 +29,30 @@ scene 생성을 시작하기 위한 필수 메타는 다음이다.
 
 ## 설치
 
+빠른 설치:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh | bash
+```
+
+기본 설치 경로는 `~/.local/bin/heeforge`다. 다른 경로에 설치하려면:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh | \
+  HEEFORGE_INSTALL_DIR=/usr/local/bin bash
+```
+
+특정 릴리스를 설치하려면:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh | \
+  HEEFORGE_VERSION=v0.1.0 bash
+```
+
+설치 스크립트는 현재 플랫폼을 감지하고 GitHub Releases에서 `heeforge-<target>.tar.gz` 자산을 내려받는다.
+
+소스에서 직접 빌드하려면:
+
 1. Rust stable 설치
 2. `codex` CLI 설치
 3. `codex login` 실행
@@ -58,17 +82,29 @@ cargo build --release
 release 바이너리 배포 기준 권장 절차:
 
 ```bash
-cargo build --release
-mkdir -p dist
-cp target/release/heeforge dist/heeforge
+./scripts/package-release.sh x86_64-unknown-linux-gnu
+./scripts/package-release.sh aarch64-unknown-linux-gnu
+./scripts/package-release.sh x86_64-apple-darwin
+./scripts/package-release.sh aarch64-apple-darwin
 ```
 
-사용자 머신 설치 예시:
+생성되는 자산 이름은 다음 규약을 따른다.
+
+- `dist/heeforge-x86_64-unknown-linux-gnu.tar.gz`
+- `dist/heeforge-aarch64-unknown-linux-gnu.tar.gz`
+- `dist/heeforge-x86_64-apple-darwin.tar.gz`
+- `dist/heeforge-aarch64-apple-darwin.tar.gz`
+- 각 자산에 대응하는 `.sha256`
+
+사용자 머신 수동 설치 예시:
 
 ```bash
-install -m 755 dist/heeforge /usr/local/bin/heeforge
+tar -xzf dist/heeforge-x86_64-unknown-linux-gnu.tar.gz
+install -m 755 heeforge /usr/local/bin/heeforge
 heeforge init ~/novels/my-first-novel
 ```
+
+GitHub tag를 `v*` 형식으로 푸시하면 `.github/workflows/release.yml`이 위 자산을 빌드해 Release에 첨부한다. `install.sh`는 이 자산 규약을 전제로 동작한다.
 
 설치 직후 도움말 확인:
 
@@ -80,9 +116,11 @@ heeforge next-scene --help
 배포 전 최소 확인:
 
 - `cargo test`
-- `./target/release/heeforge init <workspace>`
-- `./target/release/heeforge --workspace <workspace> next-scene`
-- `./target/release/heeforge --workspace <workspace> --format json status`
+- `./scripts/package-release.sh <target>`
+- `./target/<target>/release/heeforge init <workspace>`
+- `./target/<target>/release/heeforge --workspace <workspace> next-scene`
+- `./target/<target>/release/heeforge --workspace <workspace> --format json status`
+- `HEEFORGE_DOWNLOAD_URL=file:///... ./install.sh` 로 로컬 설치 smoke check
 - `codex login` 이후 실제 codex 경로 검증
 
 ## 사용법
@@ -170,6 +208,10 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 
 - `HEEFORGE_CODEX_CMD`: 기본값 `codex`
 - `HEEFORGE_ALLOW_DUMMY`: 기본값 `true`
+- `HEEFORGE_INSTALL_DIR`: install script 기본값 `~/.local/bin`
+- `HEEFORGE_VERSION`: install script 기본값 `latest`
+- `HEEFORGE_REPO`: install script 기본값 `johwanghee/heeforge`
+- `HEEFORGE_DOWNLOAD_URL`: install script 테스트/override용 직접 자산 URL
 
 `HEEFORGE_ALLOW_DUMMY=false`로 두면 codex CLI가 없거나 로그인되지 않았을 때 명확한 에러를 반환한다.
 환경 변수 우선순위는 전역 설정 파일보다 높다.
@@ -180,6 +222,7 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 - 전역 `config.toml`, 소설별 `novel.toml`, 내부 `workspace.json` 분리
 - `init` 시 필수 메타 인터랙티브 입력 유도
 - `--help` 예시 보강 및 `--format text|json` 이중 출력
+- `curl ... | bash` 형태를 위한 `install.sh`와 release asset 규약
 - `next-scene` 전 필수 novel config 검증
 - state JSON 관리
 - core/story/active memory markdown 관리

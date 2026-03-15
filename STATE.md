@@ -14,6 +14,9 @@
 - CLI 전역 옵션 `--format text|json`이 추가됐다.
 - command 출력은 사람용 text와 에이전트용 JSON 계약으로 통일됐다.
 - `--help`가 quickstart, 자동화 예시, subcommand 예시를 포함하도록 보강됐다.
+- 저장소 루트 `install.sh`가 GitHub Release 자산 설치를 지원한다.
+- `scripts/package-release.sh`가 target별 `heeforge-<target>.tar.gz`와 `.sha256`를 생성한다.
+- `.github/workflows/release.yml`가 `v*` tag push 시 release 자산 발행을 담당한다.
 - `next-scene`은 `premise`, `protagonist_name` 등 필수 `novel.toml` 값이 비어 있으면 실패한다.
 - planner/writer/editor/critic 프롬프트 템플릿이 `src/prompts/`로 분리됐다.
 - scene 생성 로그, review JSON, rewrite snapshot 저장이 추가됐다.
@@ -34,6 +37,7 @@
 - smoke test가 필수 메타 누락 시 scene 생성 차단도 검증한다.
 - 인터랙티브 `heeforge init`로 `premise`, `protagonist_name` 입력 후 `novel.toml` 반영이 확인됐다.
 - 바이너리 테스트에서 `--help`, `status --format json`, `next-scene --format json` 에러 payload가 검증됐다.
+- 로컬 release asset을 만든 뒤 `HEEFORGE_DOWNLOAD_URL=file://... ./install.sh` 설치 smoke check가 통과했다.
 - 요구된 문서 파일인 `README.md`, `.env.example`, `AGENTS.md`, `SPEC.md`, `STATE.md`가 존재한다.
 
 ## Not Yet Verified
@@ -47,6 +51,7 @@
 - chapter 승인 정책과 open conflict 해소 정책은 아직 단순하다.
 - 실제 codex 응답 형식이 JSON 규약을 어기면 fallback 동작에 의존하게 된다.
 - JSON 출력 계약은 현재 안정화됐지만 아직 command별 세부 schema versioning은 없다.
+- GitHub Actions runner 가용성에 따라 `ubuntu-24.04-arm` release job은 저장소 환경에서 추가 검증이 필요할 수 있다.
 
 ## Recommended Next Actions
 
@@ -55,3 +60,4 @@
 3. planner/writer/editor/critic에 대한 fixture 기반 테스트를 추가한다.
 4. scene rewrite와 approve 시나리오에 대한 회귀 테스트를 추가한다.
 5. `doctor` 명령을 추가해 사용자 친화적 진단과 remediation 출력을 강화한다.
+6. tag release 한 번을 실제로 발행해 `install.sh`가 원격 Release 경로에서도 정상 동작하는지 검증한다.
