@@ -1,6 +1,9 @@
 use anyhow::Result;
+use heeforge::models::Scene;
+use heeforge::utils::markdown::render_scene;
 use heeforge::{Config, NovelEngine};
 use serde_json::Value;
+use std::path::Path;
 use std::process::Command;
 use tempfile::tempdir;
 
@@ -42,13 +45,170 @@ fn status_json_output_is_structured() -> Result<()> {
     let payload: Value = serde_json::from_str(&stdout)?;
     assert_eq!(payload["status"], "ok");
     assert_eq!(payload["command"], "status");
-    assert_eq!(payload["workspace"], workspace.display().to_string());
+    assert_same_path(
+        payload["workspace"].as_str().unwrap_or_default(),
+        &workspace,
+    )?;
     assert!(payload["summary"]
         .as_str()
         .unwrap_or_default()
         .contains("Workspace"));
     assert!(payload["details"].is_array());
     assert!(payload["next_steps"].is_array());
+
+    Ok(())
+}
+
+#[test]
+fn init_json_creates_ready_workspace_without_prompting() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("fresh-novel");
+    let global_dir = temp_dir.path().join("config-home");
+
+    let output = Command::new(novel_bin())
+        .arg("--format")
+        .arg("json")
+        .arg("init")
+        .arg(&workspace)
+        .arg("--title")
+        .arg("Fresh Novel")
+        .arg("--genre")
+        .arg("Mystery")
+        .arg("--tone")
+        .arg("Tense, atmospheric")
+        .arg("--premise")
+        .arg("A damaged investigator chases a missing sibling through a city built on edited memories.")
+        .arg("--protagonist")
+        .arg("Yunseo")
+        .arg("--language")
+        .arg("ko")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["command"], "init");
+    assert_same_path(
+        payload["workspace"].as_str().unwrap_or_default(),
+        &workspace,
+    )?;
+    assert_eq!(detail_value(&payload, "title"), Some("Fresh Novel"));
+    assert!(workspace.join("novel.toml").exists());
+    assert!(workspace.join("README.md").exists());
+    assert!(workspace.join("98_Templates/Scene Template.md").exists());
+
+    Ok(())
+}
+
+#[test]
+fn status_json_auto_detects_workspace_from_nested_directory() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let nested_dir = workspace.join("notes/drafts");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+    std::fs::create_dir_all(&nested_dir)?;
+
+    let output = Command::new(novel_bin())
+        .arg("--format")
+        .arg("json")
+        .arg("status")
+        .current_dir(&nested_dir)
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["command"], "status");
+    assert_same_path(
+        payload["workspace"].as_str().unwrap_or_default(),
+        &workspace,
+    )?;
+
+    Ok(())
+}
+
+#[test]
+fn review_json_output_is_structured() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+    engine.generate_next_scene()?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("review")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env(
+            "HEEFORGE_CODEX_CMD",
+            "codex-command-for-tests-that-does-not-exist",
+        )
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["command"], "review");
+    assert_eq!(detail_value(&payload, "scene_id"), Some("scene_001_001"));
+    let issue_count = detail_value(&payload, "issue_count")
+        .unwrap_or("0")
+        .parse::<u32>()?;
+    assert!(issue_count >= 1);
+    assert!(payload["body"].as_str().unwrap_or_default().contains("1."));
+    assert!(workspace
+        .join("06_Review/Feedback/scene_001_001.json")
+        .exists());
+
+    Ok(())
+}
+
+#[test]
+fn review_json_error_without_current_scene_is_structured() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("review")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8(output.stderr)?;
+    let payload: Value = serde_json::from_str(&stderr)?;
+    assert_eq!(payload["status"], "error");
+    assert_eq!(payload["command"], "review");
+    assert_eq!(payload["error_code"], "no_current_scene");
+    assert!(payload["reason"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("no current scene available to review"));
+    assert!(payload["remediation"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .any(|item| item.as_str().unwrap_or_default().contains("next-scene")));
 
     Ok(())
 }
@@ -90,6 +250,481 @@ fn next_scene_json_error_contains_remediation() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn show_json_output_is_structured() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+    engine.generate_next_scene()?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("show")
+        .arg("scene_001_001")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["command"], "show");
+    assert_eq!(detail_value(&payload, "scene_id"), Some("scene_001_001"));
+    assert_eq!(
+        detail_value(&payload, "short_title"),
+        Some("Securing the Lead")
+    );
+    assert!(payload["body"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("The protagonist stepped into the scene"));
+
+    Ok(())
+}
+
+#[test]
+fn show_json_error_for_missing_scene_is_structured() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("show")
+        .arg("scene_999_999")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8(output.stderr)?;
+    let payload: Value = serde_json::from_str(&stderr)?;
+    assert_eq!(payload["status"], "error");
+    assert_eq!(payload["command"], "show");
+    assert_eq!(payload["error_code"], "command_failed");
+    assert!(payload["reason"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("scene_999_999"));
+    let expected_example = format!("heeforge --workspace {} show", workspace.display());
+    assert_eq!(
+        payload["example_command"].as_str().unwrap_or_default(),
+        expected_example
+    );
+
+    Ok(())
+}
+
+#[test]
+fn next_scene_json_auto_detects_workspace_from_nested_directory() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let nested_dir = workspace.join("notes/drafts");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+    std::fs::create_dir_all(&nested_dir)?;
+
+    let output = Command::new(novel_bin())
+        .arg("--format")
+        .arg("json")
+        .arg("next-scene")
+        .current_dir(&nested_dir)
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env(
+            "HEEFORGE_CODEX_CMD",
+            "codex-command-for-tests-that-does-not-exist",
+        )
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["command"], "next-scene");
+    assert_same_path(
+        payload["workspace"].as_str().unwrap_or_default(),
+        &workspace,
+    )?;
+    assert_eq!(
+        detail_value(&payload, "short_title"),
+        Some("Securing the Lead")
+    );
+    let scene_path = scene_file_path(&workspace, "scene_001_001")?;
+    assert!(scene_path.exists());
+    assert_eq!(
+        scene_path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or_default(),
+        "scene_001_001-securing-the-lead.md"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn memory_json_output_is_structured() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+    engine.generate_next_scene()?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("memory")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["command"], "memory");
+    let core_bytes = detail_value(&payload, "core_memory_bytes")
+        .unwrap_or("0")
+        .parse::<usize>()?;
+    let story_bytes = detail_value(&payload, "story_memory_bytes")
+        .unwrap_or("0")
+        .parse::<usize>()?;
+    let active_bytes = detail_value(&payload, "active_memory_bytes")
+        .unwrap_or("0")
+        .parse::<usize>()?;
+    assert!(core_bytes > 0);
+    assert!(story_bytes > 0);
+    assert!(active_bytes > 0);
+    let body = payload["body"].as_str().unwrap_or_default();
+    assert!(body.contains("=== Core Memory ==="));
+    assert!(body.contains("Securing the Lead"));
+
+    Ok(())
+}
+
+#[test]
+fn rewrite_json_output_preserves_history_and_updates_scene() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+    engine.generate_next_scene()?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("rewrite")
+        .arg("scene_001_001")
+        .arg("--instruction")
+        .arg("Make it darker and sharper")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env(
+            "HEEFORGE_CODEX_CMD",
+            "codex-command-for-tests-that-does-not-exist",
+        )
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["command"], "rewrite");
+    assert_same_path(
+        payload["workspace"].as_str().unwrap_or_default(),
+        &workspace,
+    )?;
+    assert_eq!(detail_value(&payload, "scene_id"), Some("scene_001_001"));
+    assert_eq!(
+        detail_value(&payload, "short_title"),
+        Some("Securing the Lead")
+    );
+    assert_eq!(detail_value(&payload, "status"), Some("draft"));
+    assert_eq!(
+        detail_value(&payload, "instruction"),
+        Some("Make it darker and sharper")
+    );
+    assert!(payload["body"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("The revision now leans harder into Make it darker and sharper."));
+
+    let scene_markdown = std::fs::read_to_string(scene_file_path(&workspace, "scene_001_001")?)?;
+    assert!(scene_markdown.contains("## Short Title\nSecuring the Lead"));
+    assert!(scene_markdown.contains("## Status\ndraft"));
+    assert!(
+        scene_markdown.contains("The revision now leans harder into Make it darker and sharper.")
+    );
+
+    let history_dir = workspace.join("06_Review/Revisions/scene_001_001");
+    assert!(history_dir.join("rewrite_001_original.md").exists());
+    assert!(history_dir.join("rewrite_001_rewritten.md").exists());
+    assert!(history_dir.join("rewrite_001.json").exists());
+
+    Ok(())
+}
+
+#[test]
+fn expand_world_json_output_updates_story_memory() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("expand-world")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env(
+            "HEEFORGE_CODEX_CMD",
+            "codex-command-for-tests-that-does-not-exist",
+        )
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["command"], "expand-world");
+    assert_eq!(detail_value(&payload, "memory_scope"), Some("story_memory"));
+    assert!(payload["body"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("# World Expansion"));
+
+    let story_memory = std::fs::read_to_string(workspace.join(".novel/memory/story_memory.md"))?;
+    assert!(story_memory.contains("## World Expansion"));
+
+    Ok(())
+}
+
+#[test]
+fn next_chapter_json_output_includes_short_title_and_slugged_path() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+    engine.generate_next_scene()?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("next-chapter")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["command"], "next-chapter");
+    assert_eq!(detail_value(&payload, "chapter"), Some("1"));
+    assert_eq!(
+        detail_value(&payload, "short_title"),
+        Some("Securing the Lead")
+    );
+
+    let chapter_path = payload["artifacts"]
+        .as_array()
+        .and_then(|items| items.first())
+        .and_then(|item| item["path"].as_str())
+        .ok_or_else(|| anyhow::anyhow!("missing chapter artifact path"))?;
+    assert!(chapter_path.ends_with("chapter_001-securing-the-lead.md"));
+    let chapter_markdown = std::fs::read_to_string(chapter_path)?;
+    assert!(chapter_markdown.contains("## Short Title\nSecuring the Lead"));
+
+    Ok(())
+}
+
+#[test]
+fn next_chapter_json_error_without_scenes_is_structured() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("next-chapter")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8(output.stderr)?;
+    let payload: Value = serde_json::from_str(&stderr)?;
+    assert_eq!(payload["status"], "error");
+    assert_eq!(payload["command"], "next-chapter");
+    assert_eq!(payload["error_code"], "empty_chapter");
+    assert!(payload["reason"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("no scenes found for chapter 001"));
+    assert!(payload["remediation"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .any(|item| item.as_str().unwrap_or_default().contains("next-scene")));
+
+    Ok(())
+}
+
+#[test]
+fn next_chapter_json_error_for_gapped_sequence_is_structured() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+    write_scene(
+        &workspace,
+        Scene {
+            id: "scene_001_001".to_string(),
+            chapter: 1,
+            scene_number: 1,
+            short_title: "Goal One".to_string(),
+            goal: "Goal one".to_string(),
+            conflict: "Conflict one".to_string(),
+            outcome: "Outcome one".to_string(),
+            text: "Scene one text.".to_string(),
+            status: "draft".to_string(),
+        },
+    )?;
+    write_scene(
+        &workspace,
+        Scene {
+            id: "scene_001_003".to_string(),
+            chapter: 1,
+            scene_number: 3,
+            short_title: "Goal Three".to_string(),
+            goal: "Goal three".to_string(),
+            conflict: "Conflict three".to_string(),
+            outcome: "Outcome three".to_string(),
+            text: "Scene three text.".to_string(),
+            status: "draft".to_string(),
+        },
+    )?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("next-chapter")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8(output.stderr)?;
+    let payload: Value = serde_json::from_str(&stderr)?;
+    assert_eq!(payload["status"], "error");
+    assert_eq!(payload["command"], "next-chapter");
+    assert_eq!(payload["error_code"], "invalid_scene_sequence");
+    assert!(payload["reason"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("scene order is invalid"));
+    assert!(payload["remediation"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .any(|item| item.as_str().unwrap_or_default().contains("without gaps")));
+
+    Ok(())
+}
+
+#[test]
+fn approve_json_output_marks_scene_and_state_as_approved() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+    engine.generate_next_scene()?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("approve")
+        .arg("scene_001_001")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["command"], "approve");
+    assert_same_path(
+        payload["workspace"].as_str().unwrap_or_default(),
+        &workspace,
+    )?;
+    assert_eq!(detail_value(&payload, "scene_id"), Some("scene_001_001"));
+
+    let scene_markdown = std::fs::read_to_string(scene_file_path(&workspace, "scene_001_001")?)?;
+    assert!(scene_markdown.contains("## Status\napproved"));
+
+    let status_output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("status")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(status_output.status.success());
+
+    let status_stdout = String::from_utf8(status_output.stdout)?;
+    let status_payload: Value = serde_json::from_str(&status_stdout)?;
+    assert_eq!(
+        detail_value(&status_payload, "stage"),
+        Some("scene_approved")
+    );
+    assert_eq!(
+        detail_value(&status_payload, "current_scene_id"),
+        Some("scene_001_001")
+    );
+
+    Ok(())
+}
+
 fn ready_engine(
     workspace: std::path::PathBuf,
     global_dir: std::path::PathBuf,
@@ -101,9 +736,47 @@ fn ready_engine(
         "A damaged investigator chases a missing sibling through a city built on edited memories."
             .to_string();
     config.novel_settings.protagonist_name = "Yunseo".to_string();
+    config.codex_command = "codex-command-for-tests-that-does-not-exist".to_string();
     NovelEngine::new(config)
 }
 
 fn novel_bin() -> &'static str {
     env!("CARGO_BIN_EXE_heeforge")
+}
+
+fn assert_same_path(actual: &str, expected: &Path) -> Result<()> {
+    let actual = std::fs::canonicalize(actual)?;
+    let expected = std::fs::canonicalize(expected)?;
+    assert_eq!(actual, expected);
+    Ok(())
+}
+
+fn detail_value<'a>(payload: &'a Value, label: &str) -> Option<&'a str> {
+    payload["details"]
+        .as_array()?
+        .iter()
+        .find(|item| item["label"].as_str() == Some(label))
+        .and_then(|item| item["value"].as_str())
+}
+
+fn scene_file_path(workspace: &Path, scene_id: &str) -> Result<std::path::PathBuf> {
+    let dir = workspace.join("02_Draft/Scenes");
+    for path in std::fs::read_dir(&dir)? {
+        let path = path?.path();
+        let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        if file_name == format!("{scene_id}.md") || file_name.starts_with(&format!("{scene_id}-")) {
+            return Ok(path);
+        }
+    }
+
+    Err(anyhow::anyhow!("scene file not found for {scene_id}"))
+}
+
+fn write_scene(workspace: &Path, scene: Scene) -> Result<()> {
+    let path = workspace.join("02_Draft/Scenes").join(scene.file_name());
+    std::fs::create_dir_all(path.parent().expect("scene parent"))?;
+    std::fs::write(path, render_scene(&scene))?;
+    Ok(())
 }

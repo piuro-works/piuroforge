@@ -9,7 +9,7 @@ HeeForge CLI UX는 두 가지 출력 모드를 제공한다.
 - 기본 `text`: 사람이 읽기 쉬운 요약, 경로, 다음 추천 명령 출력
 - `--format json`: Codex CLI, OpenClaw, 기타 LLM 에이전트가 안정적으로 해석할 수 있는 구조화 출력
 
-실제 소설 데이터는 엔진 소스 디렉터리가 아니라 별도 워크스페이스에 저장된다. 각 워크스페이스 루트 아래에 숨김 디렉터리 `.novel/`이 생성되고, 상태/메모리/scene/chapter 산출물이 그 안에 쌓인다.
+실제 소설 데이터는 엔진 소스 디렉터리가 아니라 별도 워크스페이스에 저장된다. 워크스페이스 루트에는 사람용 작업 폴더가 펼쳐지고, 숨김 디렉터리 `.novel/`에는 상태/로그/메모리 같은 엔진 런타임 데이터가 저장된다.
 운영 원칙은 `1 workspace = 1 novel`이다. 엔진 프로젝트 Git과 소설 작업 Git은 분리한다.
 
 설정은 3층으로 분리된다.
@@ -26,6 +26,10 @@ scene 생성을 시작하기 위한 필수 메타는 다음이다.
 - `premise`
 - `protagonist_name`
 - `language`
+
+scene 자체에는 manuscript-friendly `short_title`이 추가로 저장되며, scene 파일명 slug는 기본적으로 이 값을 사용한다.
+chapter도 compiled `short_title`을 가지며 chapter 파일명 slug는 이 값을 사용한다.
+디스크의 `story_memory.md`는 전체 이력을 유지하지만, planner/writer/expand-world 프롬프트에는 최근성과 신호가 높은 섹션 위주로 제한된 prompt view를 사용해 장편 누적 시 컨텍스트 폭주를 완화한다.
 
 ## 설치
 
@@ -58,6 +62,7 @@ curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh
 3. `codex login` 실행
 
 실제 codex 기반 생성/리뷰/수정을 쓰려면 먼저 `codex login`이 되어 있어야 한다.
+기본적으로 `codex exec` 호출은 120초 timeout이 걸려 있으며, 응답이 없으면 subprocess를 종료하고 명확한 에러를 반환한다.
 
 ## 빌드
 
@@ -156,6 +161,46 @@ git commit -m "Initialize novel workspace"
 처음 실행 시 전역 설정 파일 `~/.config/heeforge/config.toml`도 없으면 기본값으로 생성된다.
 필수값이 비어 있는 상태로 `init --no-input`을 수행한 경우 워크스페이스는 생성되지만 `next-scene` 전에 `novel.toml`을 채워야 한다.
 
+생성되는 워크스페이스 골격은 다음과 같다.
+
+```text
+<workspace>/
+├── 00_Inbox/
+├── 01_Brief/
+├── 02_Draft/
+│   ├── Scenes/
+│   ├── Chapters/
+│   ├── Fragments/
+│   └── Illustrations/
+├── 03_StoryBible/
+│   ├── Characters/
+│   ├── World/
+│   ├── Rules/
+│   ├── Timeline/
+│   └── Plot/
+├── 04_Research/
+│   ├── Sources/
+│   ├── Notes/
+│   └── References/
+├── 05_LLM/
+│   ├── Prompts/
+│   ├── Outputs/
+│   └── Sessions/
+├── 06_Review/
+│   ├── Feedback/
+│   └── Revisions/
+├── 07_Archive/
+│   ├── Snapshots/
+│   └── Deprecated/
+├── 98_Templates/
+├── README.md
+├── novel.toml
+└── .novel/
+```
+
+Git 확인용으로는 위 바깥 구조와 `novel.toml`을 커밋하고, `.novel/state/`, `.novel/logs/`, `.novel/memory/active_memory.md` 같은 런타임 데이터는 ignore하는 흐름을 권장한다.
+`init`은 루트 `README.md`, 각 주요 섹션 `README.md`, 그리고 `98_Templates/`의 starter template 파일도 함께 생성한다.
+
 워크스페이스 안에서 작업:
 
 ```bash
@@ -197,9 +242,12 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 
 ## 산출물과 로그
 
+- scene markdown: `<workspace>/02_Draft/Scenes/<scene_id>-<slug>.md` (slug는 scene의 `short_title` 기준, 만들 수 없으면 `<scene_id>.md`)
+- chapter markdown: `<workspace>/02_Draft/Chapters/chapter_<chapter>-<slug>.md` (slug는 compiled chapter `short_title` 기준, 만들 수 없으면 `chapter_<chapter>.md`)
+- review 결과 JSON: `<workspace>/06_Review/Feedback/<scene_id>.json`
+- rewrite 원본/수정본과 revision record: `<workspace>/06_Review/Revisions/<scene_id>/`
 - scene 생성 로그: `<workspace>/.novel/logs/scene_generation/<scene_id>.json`
-- review 결과 JSON: `<workspace>/.novel/logs/reviews/<scene_id>.json`
-- rewrite 원본/수정본 보존: `<workspace>/.novel/logs/rewrites/<scene_id>/`
+- opt-in prompt 로그: `<workspace>/.novel/logs/llm_prompts/*.json` (`HEEFORGE_LOG_PROMPTS=true` 또는 전역 `log_prompts = true`일 때만)
 - chapter 생성 시 scene 번호가 1부터 연속인지 검증한다.
 
 ## 환경 변수
@@ -207,13 +255,16 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 `.env.example` 참고.
 
 - `HEEFORGE_CODEX_CMD`: 기본값 `codex`
+- `HEEFORGE_CODEX_TIMEOUT_SECS`: 기본값 `120`
 - `HEEFORGE_ALLOW_DUMMY`: 기본값 `true`
+- `HEEFORGE_LOG_PROMPTS`: 기본값 `false`, `true`면 prompt/response 로그를 `.novel/logs/llm_prompts/`에 저장
 - `HEEFORGE_INSTALL_DIR`: install script 기본값 `~/.local/bin`
 - `HEEFORGE_VERSION`: install script 기본값 `latest`
 - `HEEFORGE_REPO`: install script 기본값 `johwanghee/heeforge`
 - `HEEFORGE_DOWNLOAD_URL`: install script 테스트/override용 직접 자산 URL
 
 `HEEFORGE_ALLOW_DUMMY=false`로 두면 codex CLI가 없거나 로그인되지 않았을 때 명확한 에러를 반환한다.
+`HEEFORGE_CODEX_TIMEOUT_SECS`로 실제 codex 응답 대기 시간을 조절할 수 있다.
 환경 변수 우선순위는 전역 설정 파일보다 높다.
 
 ## 현재 MVP 범위
@@ -233,6 +284,7 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 - review 결과 JSON 저장
 - chapter 컴파일 전 scene 순서 검증
 - `codex` subprocess 재시도 1회
+- `codex` subprocess timeout 및 hang 방지 강제 종료
 - 최소 smoke test 및 runner retry test
 
 ## 다음 확장 포인트

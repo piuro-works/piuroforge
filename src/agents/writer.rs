@@ -63,7 +63,7 @@ impl Agent for WriterAgent {
     fn run(&self, context: &AgentContext) -> Result<String> {
         if self.use_codex {
             let prompt = self.build_prompt(context)?;
-            match self.runner.run_prompt(&prompt) {
+            match self.runner.run_prompt_named("writer", &prompt) {
                 Ok(response) => return Ok(response),
                 Err(error) if !context.allow_dummy_fallback => return Err(error),
                 Err(_) => {}

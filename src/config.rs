@@ -21,11 +21,16 @@ pub struct Config {
     pub memory_dir: PathBuf,
     pub scenes_dir: PathBuf,
     pub chapters_dir: PathBuf,
+    pub review_feedback_dir: PathBuf,
+    pub review_revisions_dir: PathBuf,
+    pub workspace_readme_path: PathBuf,
     pub logs_dir: PathBuf,
     pub global_settings: GlobalSettings,
     pub novel_settings: NovelSettings,
     pub allow_dummy_fallback: bool,
+    pub log_prompts: bool,
     pub codex_command: String,
+    pub codex_timeout_secs: u64,
 }
 
 impl Config {
@@ -46,8 +51,11 @@ impl Config {
         let workspace_manifest_path = novel_dir.join(WORKSPACE_MANIFEST_FILE);
         let state_path = novel_dir.join("state").join("project_state.json");
         let memory_dir = novel_dir.join("memory");
-        let scenes_dir = novel_dir.join("scenes");
-        let chapters_dir = novel_dir.join("chapters");
+        let scenes_dir = workspace_dir.join("02_Draft").join("Scenes");
+        let chapters_dir = workspace_dir.join("02_Draft").join("Chapters");
+        let review_feedback_dir = workspace_dir.join("06_Review").join("Feedback");
+        let review_revisions_dir = workspace_dir.join("06_Review").join("Revisions");
+        let workspace_readme_path = workspace_dir.join("README.md");
         let logs_dir = novel_dir.join("logs");
 
         let global_settings = load_toml_or_default::<GlobalSettings>(&global_config_path)?;
@@ -67,13 +75,22 @@ impl Config {
             memory_dir,
             scenes_dir,
             chapters_dir,
+            review_feedback_dir,
+            review_revisions_dir,
+            workspace_readme_path,
             logs_dir,
             allow_dummy_fallback: env_flag("HEEFORGE_ALLOW_DUMMY")
                 .or_else(|| env_flag("NOVEL_ENGINE_ALLOW_DUMMY"))
                 .unwrap_or(global_settings.allow_dummy_fallback),
+            log_prompts: env_flag("HEEFORGE_LOG_PROMPTS")
+                .or_else(|| env_flag("NOVEL_ENGINE_LOG_PROMPTS"))
+                .unwrap_or(global_settings.log_prompts),
             codex_command: env::var("HEEFORGE_CODEX_CMD")
                 .or_else(|_| env::var("NOVEL_ENGINE_CODEX_CMD"))
                 .unwrap_or_else(|_| global_settings.codex_command.clone()),
+            codex_timeout_secs: env_u64("HEEFORGE_CODEX_TIMEOUT_SECS")
+                .or_else(|| env_u64("NOVEL_ENGINE_CODEX_TIMEOUT_SECS"))
+                .unwrap_or(global_settings.codex_timeout_secs),
             global_settings,
             novel_settings,
         })
@@ -107,8 +124,12 @@ pub struct GlobalSettings {
     pub version: u32,
     #[serde(default = "default_codex_command")]
     pub codex_command: String,
+    #[serde(default = "default_codex_timeout_secs")]
+    pub codex_timeout_secs: u64,
     #[serde(default = "default_allow_dummy_fallback")]
     pub allow_dummy_fallback: bool,
+    #[serde(default = "default_log_prompts")]
+    pub log_prompts: bool,
     #[serde(default = "default_default_language")]
     pub default_language: String,
     #[serde(default)]
@@ -120,7 +141,9 @@ impl Default for GlobalSettings {
         Self {
             version: default_config_version(),
             codex_command: default_codex_command(),
+            codex_timeout_secs: default_codex_timeout_secs(),
             allow_dummy_fallback: default_allow_dummy_fallback(),
+            log_prompts: default_log_prompts(),
             default_language: default_default_language(),
             default_workspace_root: None,
         }
@@ -228,6 +251,13 @@ fn env_flag(name: &str) -> Option<bool> {
     }
 }
 
+fn env_u64(name: &str) -> Option<u64> {
+    match env::var(name) {
+        Ok(value) => value.trim().parse::<u64>().ok(),
+        Err(_) => None,
+    }
+}
+
 fn default_title_from_path(path: &Path) -> String {
     let raw = path
         .file_name()
@@ -260,12 +290,20 @@ fn default_codex_command() -> String {
     "codex".to_string()
 }
 
+fn default_codex_timeout_secs() -> u64 {
+    120
+}
+
 fn default_allow_dummy_fallback() -> bool {
     true
 }
 
 fn default_default_language() -> String {
     "ko".to_string()
+}
+
+fn default_log_prompts() -> bool {
+    false
 }
 
 fn default_genre() -> String {

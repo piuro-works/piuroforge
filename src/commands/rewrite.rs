@@ -13,6 +13,7 @@ pub fn run(engine: &NovelEngine, scene_id: &str, instruction: &str) -> Result<Co
         "Scene rewritten successfully. Original and revised snapshots were preserved.",
     )
     .detail("scene_id", scene.id.clone())
+    .detail("short_title", scene.effective_short_title())
     .detail("status", scene.status.clone())
     .detail("instruction", instruction)
     .artifact("active_scene", engine.scene_markdown_path(scene_id))

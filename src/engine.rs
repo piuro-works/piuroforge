@@ -1,7 +1,8 @@
 use anyhow::{anyhow, Context, Result};
+use std::collections::BTreeMap;
 use std::fs;
-use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::agents::base::{strip_code_fences, Agent, AgentContext};
 use crate::agents::critic::CriticAgent;
@@ -12,12 +13,13 @@ use crate::codex_runner::CodexRunner;
 use crate::config::Config;
 use crate::memory_manager::MemoryManager;
 use crate::models::{
-    MemoryBundle, ReviewIssue, ReviewReport, RewriteRecord, Scene, SceneGenerationLog, ScenePlan,
-    StoryState, WorkspaceManifest,
+    derive_short_title, slug_fragment, MemoryBundle, ReviewIssue, ReviewReport, RewriteRecord,
+    Scene, SceneGenerationLog, ScenePlan, StoryState, WorkspaceManifest,
 };
 use crate::state_manager::StateManager;
 use crate::utils::files::{ensure_dir, list_markdown_files, read_string, write_string};
 use crate::utils::markdown::{parse_scene, render_chapter, render_scene};
+use crate::workspace_scaffold::{scaffold_files, SCAFFOLD_DIRS};
 
 #[derive(Debug, Clone)]
 pub struct NovelEngine {
@@ -31,7 +33,13 @@ impl NovelEngine {
     pub fn new(config: Config) -> Result<Self> {
         let state_manager = StateManager::new(config.state_path.clone());
         let memory_manager = MemoryManager::new(config.memory_dir.clone());
-        let codex_runner = CodexRunner::new(config.codex_command.clone());
+        let mut codex_runner = CodexRunner::new(
+            config.codex_command.clone(),
+            Duration::from_secs(config.codex_timeout_secs),
+        );
+        if config.log_prompts {
+            codex_runner = codex_runner.with_prompt_logging(config.logs_dir.join("llm_prompts"));
+        }
 
         Ok(Self {
             config,
@@ -47,6 +55,7 @@ impl NovelEngine {
         self.ensure_workspace_config_file()?;
         self.ensure_workspace_manifest()?;
         self.ensure_workspace_gitignore()?;
+        self.ensure_workspace_support_files()?;
         self.state_manager.ensure_state_file()?;
         self.memory_manager.ensure_files()?;
         Ok(())
@@ -58,6 +67,7 @@ impl NovelEngine {
         self.write_workspace_config_file()?;
         self.write_workspace_manifest()?;
         self.ensure_workspace_gitignore()?;
+        self.ensure_workspace_support_files()?;
         self.state_manager.ensure_state_file()?;
         self.memory_manager.ensure_files()?;
         Ok(())
@@ -73,7 +83,7 @@ impl NovelEngine {
         self.ensure_generation_ready()?;
 
         let mut state = self.state_manager.load_state()?;
-        let memory = self.memory_manager.load_bundle()?;
+        let memory = self.memory_manager.load_prompt_bundle()?;
         let (chapter, scene_number, scene_id) = self.state_manager.next_scene_identity(&state);
 
         let planner = PlannerAgent::new(self.codex_runner.clone(), true);
@@ -107,6 +117,7 @@ impl NovelEngine {
             id: scene_id,
             chapter,
             scene_number,
+            short_title: scene_plan.effective_short_title(),
             goal: scene_plan.goal.clone(),
             conflict: scene_plan.conflict.clone(),
             outcome: scene_plan.outcome.clone(),
@@ -215,8 +226,8 @@ impl NovelEngine {
             scene_id: scene_id.to_string(),
             instruction: instruction.to_string(),
             revision,
-            original_snapshot_path: original_snapshot_path.display().to_string(),
-            rewritten_snapshot_path: rewritten_snapshot_path.display().to_string(),
+            original_snapshot_path: self.workspace_relative_path(&original_snapshot_path),
+            rewritten_snapshot_path: self.workspace_relative_path(&rewritten_snapshot_path),
         })?;
 
         if state.current_scene_id.as_deref() == Some(scene_id) {
@@ -260,18 +271,17 @@ impl NovelEngine {
         }
         self.validate_scene_sequence(chapter, &scenes)?;
 
-        let content = render_chapter(chapter, &scenes);
-        let chapter_path = self
-            .config
-            .chapters_dir
-            .join(format!("chapter_{:03}.md", chapter));
+        let chapter_short_title = self.derive_chapter_short_title(chapter, &scenes);
+        let content = render_chapter(chapter, &chapter_short_title, &scenes);
+        let chapter_path = self.chapter_path(chapter, &chapter_short_title);
         write_string(&chapter_path, &content)?;
 
         self.memory_manager.append_story_memory(&format!(
-            "## Chapter {:03}\n- Compiled {} scene(s) into {}\n",
+            "## Chapter {:03}: {}\n- Compiled {} scene(s) into {}\n",
             chapter,
+            chapter_short_title,
             scenes.len(),
-            chapter_path.display()
+            self.workspace_relative_path(&chapter_path)
         ))?;
 
         self.state_manager.begin_next_chapter(&mut state);
@@ -283,7 +293,7 @@ impl NovelEngine {
     pub fn expand_world(&self) -> Result<String> {
         self.init_project()?;
 
-        let memory = self.memory_manager.load_bundle()?;
+        let memory = self.memory_manager.load_prompt_bundle()?;
         let prompt = format!(
             "You are expanding the world bible for HeeForge, a CLI-first AI novel engine.\n\
 Return plain markdown only with one new section that deepens setting, factions, or rules.\n\n\
@@ -293,7 +303,7 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
             active = memory.active_memory,
         );
 
-        let expansion = match self.codex_runner.run_prompt(&prompt) {
+        let expansion = match self.codex_runner.run_prompt_named("expand-world", &prompt) {
             Ok(response) => response,
             Err(error) if !self.config.allow_dummy_fallback => return Err(error),
             Err(_) => "# World Expansion\n\n- A hidden civic pact binds the city guilds to a forgotten disaster beneath the harbor.\n- Anyone who breaks the pact inherits both political leverage and mortal risk.\n".to_string(),
@@ -312,7 +322,7 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
 
     pub fn show_scene(&self, scene_id: &str) -> Result<Scene> {
         self.init_project()?;
-        let path = self.scene_path(scene_id);
+        let path = self.resolved_scene_path(scene_id);
         let content = read_string(&path)?;
         parse_scene(&content).with_context(|| format!("failed to parse {}", path.display()))
     }
@@ -337,6 +347,10 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
         &self.config.workspace_manifest_path
     }
 
+    pub fn workspace_readme_path(&self) -> &std::path::Path {
+        &self.config.workspace_readme_path
+    }
+
     pub fn novel_title(&self) -> &str {
         self.config.novel_title()
     }
@@ -346,7 +360,7 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
     }
 
     pub fn scene_markdown_path(&self, scene_id: &str) -> PathBuf {
-        self.scene_path(scene_id)
+        self.resolved_scene_path(scene_id)
     }
 
     pub fn scene_generation_log_path(&self, scene_id: &str) -> PathBuf {
@@ -356,28 +370,39 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
             .join(format!("{scene_id}.json"))
     }
 
+    pub fn chapter_short_title(&self, chapter: u32) -> Result<Option<String>> {
+        let scenes = self.load_scenes_for_chapter(chapter)?;
+        if scenes.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(Some(self.derive_chapter_short_title(chapter, &scenes)))
+    }
+
     pub fn review_report_path(&self, scene_id: &str) -> PathBuf {
         self.config
-            .logs_dir
-            .join("reviews")
+            .review_feedback_dir
             .join(format!("{scene_id}.json"))
     }
 
     pub fn rewrite_history_dir(&self, scene_id: &str) -> PathBuf {
-        self.config.logs_dir.join("rewrites").join(scene_id)
+        self.config.review_revisions_dir.join(scene_id)
     }
 
     fn ensure_layout(&self) -> Result<()> {
         ensure_dir(&self.config.workspace_dir)?;
         ensure_dir(&self.config.global_config_dir)?;
         ensure_dir(&self.config.novel_dir)?;
-        ensure_dir(&self.config.scenes_dir)?;
-        ensure_dir(&self.config.chapters_dir)?;
         ensure_dir(&self.config.logs_dir)?;
         if let Some(parent) = self.config.state_path.parent() {
             ensure_dir(parent)?;
         }
         ensure_dir(&self.config.memory_dir)?;
+
+        for dir in SCAFFOLD_DIRS {
+            ensure_dir(&self.config.workspace_dir.join(dir))?;
+        }
+
         Ok(())
     }
 
@@ -438,6 +463,19 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
         write_string(&path, content)
     }
 
+    fn ensure_workspace_support_files(&self) -> Result<()> {
+        for file in scaffold_files(self.config.novel_title()) {
+            let path = self.config.workspace_dir.join(file.relative_path);
+            if path.exists() {
+                continue;
+            }
+
+            write_string(&path, &file.content)?;
+        }
+
+        Ok(())
+    }
+
     fn save_scene_generation_log(&self, log: SceneGenerationLog) -> Result<()> {
         let path = self.scene_generation_log_path(&log.scene_id);
         let content = serde_json::to_string_pretty(&log)
@@ -467,32 +505,107 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
     }
 
     fn save_scene(&self, scene: &Scene) -> Result<PathBuf> {
-        let path = self.scene_path(&scene.id);
+        let path = self.scene_write_path(scene);
         let markdown = render_scene(scene);
         write_string(&path, &markdown)?;
         Ok(path)
     }
 
-    fn scene_path(&self, scene_id: &str) -> PathBuf {
-        self.config.scenes_dir.join(format!("{scene_id}.md"))
+    fn scene_write_path(&self, scene: &Scene) -> PathBuf {
+        self.config.scenes_dir.join(scene.file_name())
+    }
+
+    fn legacy_scene_path(&self, scene_id: &str) -> PathBuf {
+        self.config
+            .novel_dir
+            .join("scenes")
+            .join(format!("{scene_id}.md"))
+    }
+
+    fn resolved_scene_path(&self, scene_id: &str) -> PathBuf {
+        if let Some(current) = self.find_scene_path(&self.config.scenes_dir, scene_id) {
+            return current;
+        }
+
+        let current = self.config.scenes_dir.join(format!("{scene_id}.md"));
+        if current.exists() {
+            return current;
+        }
+
+        let legacy = self.legacy_scene_path(scene_id);
+        if legacy.exists() {
+            return legacy;
+        }
+
+        current
+    }
+
+    fn find_scene_path(&self, dir: &Path, scene_id: &str) -> Option<PathBuf> {
+        let prefix = format!("{scene_id}-");
+        let exact = format!("{scene_id}.md");
+
+        let entries = list_markdown_files(dir).ok()?;
+        for path in &entries {
+            let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
+                continue;
+            };
+
+            if file_name.starts_with(&prefix) {
+                return Some(path.clone());
+            }
+        }
+
+        for path in entries {
+            let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
+                continue;
+            };
+
+            if file_name == exact {
+                return Some(path);
+            }
+        }
+
+        None
+    }
+
+    fn chapter_path(&self, chapter: u32, short_title: &str) -> PathBuf {
+        let slug = slug_fragment(short_title);
+        if slug.is_empty() {
+            return self
+                .config
+                .chapters_dir
+                .join(format!("chapter_{chapter:03}.md"));
+        }
+
+        self.config
+            .chapters_dir
+            .join(format!("chapter_{chapter:03}-{slug}.md"))
     }
 
     fn load_scenes_for_chapter(&self, chapter: u32) -> Result<Vec<Scene>> {
         let prefix = format!("scene_{:03}_", chapter);
-        let mut scenes = Vec::new();
+        let mut scenes = BTreeMap::new();
 
-        for path in list_markdown_files(&self.config.scenes_dir)? {
-            let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
-                continue;
-            };
-            if !file_name.starts_with(&prefix) {
+        for dir in [self.legacy_scenes_dir(), self.config.scenes_dir.clone()] {
+            if !dir.exists() {
                 continue;
             }
 
-            let content = read_string(&path)?;
-            scenes.push(parse_scene(&content)?);
+            for path in list_markdown_files(&dir)? {
+                let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
+                    continue;
+                };
+                if !file_name.starts_with(&prefix) {
+                    continue;
+                }
+
+                let content = read_string(&path)?;
+                let scene = parse_scene(&content)?;
+                scenes.insert(scene.id.clone(), scene);
+            }
         }
 
+        let mut scenes = scenes.into_values().collect::<Vec<_>>();
         scenes.sort_by_key(|scene| scene.scene_number);
         Ok(scenes)
     }
@@ -514,29 +627,35 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
     }
 
     fn next_rewrite_revision(&self, scene_id: &str) -> Result<u32> {
-        let dir = self.rewrite_history_dir(scene_id);
-        if !dir.exists() {
-            return Ok(1);
-        }
-
         let mut max_revision = 0;
-        for entry in
-            fs::read_dir(&dir).with_context(|| format!("failed to read {}", dir.display()))?
-        {
-            let entry = entry.with_context(|| format!("failed to inspect {}", dir.display()))?;
-            let Some(file_name) = entry.file_name().to_str().map(|value| value.to_string()) else {
+        for dir in [
+            self.legacy_rewrite_history_dir(scene_id),
+            self.rewrite_history_dir(scene_id),
+        ] {
+            if !dir.exists() {
                 continue;
-            };
+            }
 
-            let Some(number) = file_name
-                .strip_prefix("rewrite_")
-                .and_then(|value| value.split('_').next())
-                .and_then(|value| value.parse::<u32>().ok())
-            else {
-                continue;
-            };
+            for entry in
+                fs::read_dir(&dir).with_context(|| format!("failed to read {}", dir.display()))?
+            {
+                let entry =
+                    entry.with_context(|| format!("failed to inspect {}", dir.display()))?;
+                let Some(file_name) = entry.file_name().to_str().map(|value| value.to_string())
+                else {
+                    continue;
+                };
 
-            max_revision = max_revision.max(number);
+                let Some(number) = file_name
+                    .strip_prefix("rewrite_")
+                    .and_then(|value| value.split('_').next())
+                    .and_then(|value| value.parse::<u32>().ok())
+                else {
+                    continue;
+                };
+
+                max_revision = max_revision.max(number);
+            }
         }
 
         Ok(max_revision + 1)
@@ -552,6 +671,7 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
         let mut plan = serde_json::from_str::<ScenePlan>(&cleaned).unwrap_or_else(|_| ScenePlan {
             chapter,
             scene_number,
+            short_title: "Decision at the Threshold".to_string(),
             goal: "The protagonist pushes the story into a new decision point.".to_string(),
             conflict: "An ally and a threat demand mutually exclusive choices.".to_string(),
             outcome: "The protagonist gains momentum, but the cost becomes personal.".to_string(),
@@ -565,6 +685,9 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
         }
         if plan.goal.trim().is_empty() {
             plan.goal = "The protagonist pushes the story into a new decision point.".to_string();
+        }
+        if plan.short_title.trim().is_empty() {
+            plan.short_title = plan.effective_short_title();
         }
         if plan.conflict.trim().is_empty() {
             plan.conflict = "An ally and a threat demand mutually exclusive choices.".to_string();
@@ -591,11 +714,12 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
 
     fn render_active_memory(&self, state: &StoryState, scene: &Scene) -> String {
         format!(
-            "# Active Memory\n\n- Arc: {}\n- Chapter: {}\n- Scene: {}\n- Scene ID: {}\n- Stage: {}\n- Goal: {}\n- Conflict: {}\n- Outcome: {}\n",
+            "# Active Memory\n\n- Arc: {}\n- Chapter: {}\n- Scene: {}\n- Scene ID: {}\n- Short Title: {}\n- Stage: {}\n- Goal: {}\n- Conflict: {}\n- Outcome: {}\n",
             state.current_arc,
             scene.chapter,
             scene.scene_number,
             scene.id.as_str(),
+            scene.effective_short_title(),
             state.stage.as_str(),
             scene.goal.as_str(),
             scene.conflict.as_str(),
@@ -605,8 +729,9 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
 
     fn render_story_memory_entry(&self, scene: &Scene) -> String {
         format!(
-            "## Scene {}\n- Goal: {}\n- Conflict: {}\n- Outcome: {}\n- Status: {}\n",
+            "## Scene {}: {}\n- Goal: {}\n- Conflict: {}\n- Outcome: {}\n- Status: {}\n",
             scene.id.as_str(),
+            scene.effective_short_title(),
             scene.goal.as_str(),
             scene.conflict.as_str(),
             scene.outcome.as_str(),
@@ -625,6 +750,46 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
             missing.join(", "),
             self.config.workspace_config_path.display()
         ))
+    }
+
+    fn derive_chapter_short_title(&self, chapter: u32, scenes: &[Scene]) -> String {
+        let Some(first) = scenes.first() else {
+            return format!("Chapter {:03}", chapter);
+        };
+
+        let Some(last) = scenes.last() else {
+            return format!("Chapter {:03}", chapter);
+        };
+
+        let first_title = first.effective_short_title();
+        let last_title = last.effective_short_title();
+
+        if scenes.len() == 1 || first_title == last_title {
+            return first_title;
+        }
+
+        let combined = format!("{first_title} to {last_title}");
+        let shortened = derive_short_title(&combined);
+        if shortened.is_empty() {
+            first_title
+        } else {
+            shortened
+        }
+    }
+
+    fn legacy_scenes_dir(&self) -> PathBuf {
+        self.config.novel_dir.join("scenes")
+    }
+
+    fn legacy_rewrite_history_dir(&self, scene_id: &str) -> PathBuf {
+        self.config.logs_dir.join("rewrites").join(scene_id)
+    }
+
+    fn workspace_relative_path(&self, path: &Path) -> String {
+        path.strip_prefix(&self.config.workspace_dir)
+            .unwrap_or(path)
+            .display()
+            .to_string()
     }
 }
 

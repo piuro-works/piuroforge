@@ -9,6 +9,7 @@ pub mod output;
 pub mod prompts;
 pub mod state_manager;
 pub mod utils;
+mod workspace_scaffold;
 
 pub use config::Config;
 pub use engine::NovelEngine;

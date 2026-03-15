@@ -120,6 +120,10 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
     output = output
         .detail("title", engine.novel_title())
         .detail(
+            "workspace_readme",
+            engine.workspace_readme_path().display().to_string(),
+        )
+        .detail(
             "global_config",
             engine.global_config_path().display().to_string(),
         )
@@ -127,8 +131,9 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
             "workspace_config",
             engine.workspace_config_path().display().to_string(),
         )
-        .detail("workspace_data", engine.novel_dir().display().to_string())
+        .detail("runtime_data", engine.novel_dir().display().to_string())
         .artifact("workspace_manifest", engine.workspace_manifest_path())
+        .artifact("workspace_readme", engine.workspace_readme_path())
         .artifact("workspace_config", engine.workspace_config_path())
         .artifact("global_config", engine.global_config_path());
 

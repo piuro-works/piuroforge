@@ -14,6 +14,7 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
         "Scene generated successfully.",
     )
     .detail("scene_id", scene.id.clone())
+    .detail("short_title", scene.effective_short_title())
     .detail("goal", scene.goal.clone())
     .detail("conflict", scene.conflict.clone())
     .detail("outcome", scene.outcome.clone())

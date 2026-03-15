@@ -15,10 +15,27 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
     assert!(temp_dir.path().join("config-home/config.toml").exists());
     let global_config = std::fs::read_to_string(temp_dir.path().join("config-home/config.toml"))?;
     assert!(global_config.contains("codex_command = \"codex\""));
+    assert!(global_config.contains("log_prompts = false"));
     assert!(workspace.join(".novel/workspace.json").exists());
     assert!(workspace.join("novel.toml").exists());
+    assert!(workspace.join("README.md").exists());
+    assert!(workspace.join("02_Draft/Scenes").exists());
+    assert!(workspace.join("02_Draft/Chapters").exists());
+    assert!(workspace.join("03_StoryBible/Characters").exists());
+    assert!(workspace.join("04_Research/Sources").exists());
+    assert!(workspace.join("06_Review/Feedback").exists());
+    assert!(workspace.join("06_Review/Revisions").exists());
     let workspace_config = std::fs::read_to_string(workspace.join("novel.toml"))?;
     assert!(workspace_config.contains("title = \"Demo Novel\""));
+    let workspace_readme = std::fs::read_to_string(workspace.join("README.md"))?;
+    assert!(workspace_readme.contains("This workspace separates human-facing manuscript files"));
+    let draft_readme = std::fs::read_to_string(workspace.join("02_Draft/README.md"))?;
+    assert!(draft_readme.contains("Human-facing manuscript work lives here."));
+    let template = std::fs::read_to_string(workspace.join("98_Templates/Scene Template.md"))?;
+    assert!(template.contains("## Objective"));
+    let review_template =
+        std::fs::read_to_string(workspace.join("98_Templates/Review Pass Template.md"))?;
+    assert!(review_template.contains("## Findings"));
     assert!(workspace.join(".novel/state/project_state.json").exists());
     assert!(workspace.join(".novel/memory/core_memory.md").exists());
     assert!(workspace.join(".novel/memory/story_memory.md").exists());
@@ -40,11 +57,21 @@ fn generate_next_scene_saves_dummy_scene_markdown() -> Result<()> {
     let scene = engine.generate_next_scene()?;
 
     assert_eq!(scene.id, "scene_001_001");
-    let scene_path = workspace.join(".novel/scenes/scene_001_001.md");
+    let scene_path = scene_file_path(&workspace, "scene_001_001")?;
     assert!(scene_path.exists());
+    assert_eq!(
+        scene_path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or_default(),
+        "scene_001_001-securing-the-lead.md"
+    );
 
     let saved = std::fs::read_to_string(scene_path)?;
     assert!(saved.contains("# Scene scene_001_001"));
+    assert!(saved.contains("## Short Title\nSecuring the Lead"));
+    let reloaded = engine.show_scene("scene_001_001")?;
+    assert_eq!(reloaded.status, "draft");
     assert!(saved.contains("## Text"));
     let log =
         std::fs::read_to_string(workspace.join(".novel/logs/scene_generation/scene_001_001.json"))?;
@@ -73,6 +100,37 @@ fn generate_next_scene_requires_initial_novel_metadata() -> Result<()> {
 }
 
 #[test]
+fn generate_next_chapter_saves_slugged_markdown() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let engine = test_engine(workspace.clone(), temp_dir.path().join("config-home"))?;
+
+    engine.init_project()?;
+    engine.generate_next_scene()?;
+    let chapter_path = engine.generate_next_chapter()?;
+
+    assert_eq!(
+        chapter_path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or_default(),
+        "chapter_001-securing-the-lead.md"
+    );
+
+    let content = std::fs::read_to_string(&chapter_path)?;
+    assert!(content.contains("# Chapter 001"));
+    assert!(content.contains("## Short Title\nSecuring the Lead"));
+    assert!(!content.contains("Status: draft\ndraft"));
+
+    let state = engine.get_status()?;
+    assert_eq!(state.current_chapter, 2);
+    assert_eq!(state.current_scene, 0);
+    assert_eq!(state.stage, "chapter_ready");
+
+    Ok(())
+}
+
+#[test]
 fn review_and_rewrite_persist_artifacts() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
@@ -83,20 +141,25 @@ fn review_and_rewrite_persist_artifacts() -> Result<()> {
 
     let issues = engine.review_current_scene()?;
     assert!(!issues.is_empty());
-    let report = std::fs::read_to_string(workspace.join(".novel/logs/reviews/scene_001_001.json"))?;
+    let report = std::fs::read_to_string(workspace.join("06_Review/Feedback/scene_001_001.json"))?;
     assert!(report.contains("\"scene_id\": \"scene_001_001\""));
 
     let rewritten = engine.rewrite_scene("scene_001_001", "Make it darker and sharper")?;
     assert_eq!(rewritten.id, "scene_001_001");
-    let history_dir = workspace.join(".novel/logs/rewrites/scene_001_001");
+    let history_dir = workspace.join("06_Review/Revisions/scene_001_001");
     assert!(history_dir.join("rewrite_001_original.md").exists());
     assert!(history_dir.join("rewrite_001_rewritten.md").exists());
     assert!(history_dir.join("rewrite_001.json").exists());
 
     let original_snapshot = std::fs::read_to_string(history_dir.join("rewrite_001_original.md"))?;
     let rewritten_snapshot = std::fs::read_to_string(history_dir.join("rewrite_001_rewritten.md"))?;
+    let record = std::fs::read_to_string(history_dir.join("rewrite_001.json"))?;
     assert!(original_snapshot.contains(original.text.lines().next().unwrap_or_default()));
     assert!(rewritten_snapshot.contains("The revision now leans harder into"));
+    assert!(record.contains(
+        "\"original_snapshot_path\": \"06_Review/Revisions/scene_001_001/rewrite_001_original.md\""
+    ));
+    assert!(record.contains("\"rewritten_snapshot_path\": \"06_Review/Revisions/scene_001_001/rewrite_001_rewritten.md\""));
 
     Ok(())
 }
@@ -114,6 +177,7 @@ fn next_chapter_rejects_gapped_scene_sequence() -> Result<()> {
             id: "scene_001_001".to_string(),
             chapter: 1,
             scene_number: 1,
+            short_title: "Goal One".to_string(),
             goal: "Goal one".to_string(),
             conflict: "Conflict one".to_string(),
             outcome: "Outcome one".to_string(),
@@ -127,6 +191,7 @@ fn next_chapter_rejects_gapped_scene_sequence() -> Result<()> {
             id: "scene_001_003".to_string(),
             chapter: 1,
             scene_number: 3,
+            short_title: "Goal Three".to_string(),
             goal: "Goal three".to_string(),
             conflict: "Conflict three".to_string(),
             outcome: "Outcome three".to_string(),
@@ -171,12 +236,25 @@ fn config_layers_remain_separated() -> Result<()> {
 }
 
 fn write_scene(workspace: &std::path::Path, scene: Scene) -> Result<()> {
-    let path = workspace
-        .join(".novel/scenes")
-        .join(format!("{}.md", scene.id));
+    let path = workspace.join("02_Draft/Scenes").join(scene.file_name());
     std::fs::create_dir_all(path.parent().expect("scene parent"))?;
     std::fs::write(path, render_scene(&scene))?;
     Ok(())
+}
+
+fn scene_file_path(workspace: &std::path::Path, scene_id: &str) -> Result<std::path::PathBuf> {
+    let dir = workspace.join("02_Draft/Scenes");
+    for path in std::fs::read_dir(&dir)? {
+        let path = path?.path();
+        let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        if file_name == format!("{scene_id}.md") || file_name.starts_with(&format!("{scene_id}-")) {
+            return Ok(path);
+        }
+    }
+
+    Err(anyhow::anyhow!("scene file not found for {scene_id}"))
 }
 
 fn test_engine(

@@ -30,6 +30,8 @@ pub struct Scene {
     pub id: String,
     pub chapter: u32,
     pub scene_number: u32,
+    #[serde(default)]
+    pub short_title: String,
     pub goal: String,
     pub conflict: String,
     pub outcome: String,
@@ -38,9 +40,63 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn file_name(&self) -> String {
-        format!("{}.md", self.id)
+    pub fn effective_short_title(&self) -> String {
+        if !self.short_title.trim().is_empty() {
+            return self.short_title.trim().to_string();
+        }
+
+        derive_short_title(&self.goal)
     }
+
+    pub fn file_name(&self) -> String {
+        let slug = slug_fragment(&self.effective_short_title());
+        if slug.is_empty() {
+            return format!("{}.md", self.id);
+        }
+
+        format!("{}-{}.md", self.id, slug)
+    }
+}
+
+pub(crate) fn slug_fragment(value: &str) -> String {
+    let mut slug = String::new();
+    let mut last_was_dash = false;
+
+    for ch in value.chars() {
+        if ch.is_alphanumeric() {
+            slug.extend(ch.to_lowercase());
+            last_was_dash = false;
+        } else if !slug.is_empty() && !last_was_dash {
+            slug.push('-');
+            last_was_dash = true;
+        }
+
+        if slug.len() >= 48 {
+            break;
+        }
+    }
+
+    slug.trim_matches('-').to_string()
+}
+
+pub(crate) fn derive_short_title(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    let words = trimmed
+        .split_whitespace()
+        .take(6)
+        .map(|word| word.trim_matches(|ch: char| !ch.is_alphanumeric()))
+        .filter(|word| !word.is_empty())
+        .collect::<Vec<_>>();
+
+    if words.is_empty() {
+        return trimmed.chars().take(32).collect();
+    }
+
+    words.join(" ")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -69,6 +125,8 @@ pub struct ScenePlan {
     #[serde(default)]
     pub scene_number: u32,
     #[serde(default)]
+    pub short_title: String,
+    #[serde(default)]
     pub goal: String,
     #[serde(default)]
     pub conflict: String,
@@ -79,6 +137,14 @@ pub struct ScenePlan {
 impl ScenePlan {
     pub fn scene_id(&self) -> String {
         format!("scene_{:03}_{:03}", self.chapter, self.scene_number)
+    }
+
+    pub fn effective_short_title(&self) -> String {
+        if !self.short_title.trim().is_empty() {
+            return self.short_title.trim().to_string();
+        }
+
+        derive_short_title(&self.goal)
     }
 }
 
