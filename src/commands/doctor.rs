@@ -131,6 +131,8 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
     };
 
     let mut output = CommandOutput::ok("doctor", &config.workspace_dir, summary)
+        .detail("auth_mode", "codex_cli")
+        .detail("setup_flow", "init_then_doctor")
         .detail(
             "workspace_ready",
             yes_no(workspace_manifest_exists && workspace_config_exists),
@@ -154,6 +156,10 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
         .detail(
             "missing_required_fields",
             render_missing_fields(&missing_fields),
+        )
+        .detail(
+            "setup_complete_when",
+            "doctor reports codex_connection=ready and missing_required_fields=none",
         )
         .artifact("global_config", &config.global_config_path);
 

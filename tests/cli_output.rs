@@ -45,12 +45,18 @@ fn capabilities_json_reports_agent_contract() -> Result<()> {
     assert_eq!(payload["schema_version"], 1);
     assert_eq!(payload["agent_mode"], true);
     assert_eq!(payload["command"], "capabilities");
+    assert_eq!(detail_value(&payload, "auth_mode"), Some("codex_cli"));
+    assert_eq!(
+        detail_value(&payload, "setup_flow"),
+        Some("init_then_doctor")
+    );
     assert_eq!(detail_value(&payload, "recommended_format"), Some("json"));
     assert_eq!(detail_value(&payload, "recommended_flag"), Some("--agent"));
     assert_eq!(
         payload["data"]["recommended_invocation"],
         "heeforge --format json --agent <command>"
     );
+    assert_eq!(payload["data"]["auth_mode"], "codex_cli");
     assert!(payload["data"]["commands"].is_array());
     assert!(payload["data"]["commands"]
         .as_array()
@@ -150,6 +156,11 @@ fn doctor_json_reports_setup_issues_without_workspace() -> Result<()> {
     let payload: Value = serde_json::from_str(&stdout)?;
     assert_eq!(payload["status"], "ok");
     assert_eq!(payload["command"], "doctor");
+    assert_eq!(detail_value(&payload, "auth_mode"), Some("codex_cli"));
+    assert_eq!(
+        detail_value(&payload, "setup_flow"),
+        Some("init_then_doctor")
+    );
     assert_eq!(detail_value(&payload, "workspace_ready"), Some("no"));
     assert_eq!(detail_value(&payload, "codex_cli"), Some("missing"));
     assert_eq!(detail_value(&payload, "codex_connection"), Some("missing"));

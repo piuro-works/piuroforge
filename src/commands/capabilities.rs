@@ -129,6 +129,23 @@ pub fn run(workspace: &Path) -> Result<CommandOutput> {
     ];
 
     let data = json!({
+        "auth_mode": "codex_cli",
+        "auth_modes": [
+            {
+                "name": "codex_cli",
+                "default": true,
+                "description": "HeeForge does not perform OAuth directly. Install Codex CLI and run `codex login` first."
+            }
+        ],
+        "required_installs": ["heeforge", "codex CLI"],
+        "recommended_setup_sequence": [
+            "install heeforge",
+            "install Codex CLI",
+            "codex login",
+            "heeforge init <workspace>",
+            "heeforge --workspace <workspace> doctor",
+            "follow next_steps until doctor is ready"
+        ],
         "recommended_invocation": "heeforge --format json --agent <command>",
         "schema_version": OUTPUT_SCHEMA_VERSION,
         "success_fields": ["schema_version", "status", "agent_mode", "command", "workspace", "summary", "details", "artifacts", "next_steps", "warnings"],
@@ -138,7 +155,9 @@ pub fn run(workspace: &Path) -> Result<CommandOutput> {
             "Use --format json for stable machine-readable output.",
             "Use --agent to request compact text output and explicit agent_mode markers.",
             "Commands that mutate the workspace may auto-commit if workspace_auto_commit is enabled.",
-            "Commands that require Codex will fail with codex_unavailable unless Codex is installed, logged in, and reachable."
+            "Commands that require Codex will fail with codex_unavailable unless Codex is installed, logged in, and reachable.",
+            "Call capabilities first, then doctor, then status before mutating commands.",
+            "Current auth mode is codex_cli only. HeeForge expects `codex login` instead of direct OAuth."
         ]
     });
 
@@ -154,6 +173,8 @@ Prefer `capabilities`, then `doctor`, then `status` before mutating commands.";
         workspace,
         "HeeForge agent contract and command capabilities.",
     )
+    .detail("auth_mode", "codex_cli")
+    .detail("setup_flow", "init_then_doctor")
     .detail("recommended_format", "json")
     .detail("recommended_flag", "--agent")
     .detail("schema_version", OUTPUT_SCHEMA_VERSION.to_string())

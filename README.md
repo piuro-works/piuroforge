@@ -14,6 +14,35 @@ HeeForge CLI UX는 두 가지 출력 모드를 제공한다.
 - `text + --agent`: compact key-value 출력
 - `json + --agent`: 응답에 `schema_version`, `agent_mode`, 필요 시 command별 `data` payload 포함
 
+## 필수 준비물
+
+실제 집필 전에 필요한 설치/행동은 이 네 가지다.
+
+1. `heeforge` 설치
+2. `codex` CLI 설치
+3. 터미널에서 `codex login` 1회 실행
+4. 쓰기 가능한 워크스페이스 폴더 준비
+
+HeeForge 자체가 OAuth를 직접 처리하지는 않는다. 기본 auth mode는 `codex_cli` 하나이며, 로그인은 항상 `codex login` 기준이다.
+
+## 처음 5분
+
+처음 쓰는 사용자는 이 순서로 시작하면 된다.
+
+```bash
+codex login
+heeforge init ~/novels/my-book
+heeforge --workspace ~/novels/my-book doctor
+```
+
+그다음 규칙은 단순하다.
+
+1. `doctor`가 보여주는 `next_steps`를 처리한다.
+2. `doctor`가 `ready`면 설정은 끝이다.
+3. 그다음부터 `next-scene`, `review`, `rewrite`로 진행한다.
+
+즉 HeeForge의 기본 setup flow는 `init -> doctor -> 조치 -> next-scene`이다.
+
 실제 소설 데이터는 엔진 소스 디렉터리가 아니라 별도 워크스페이스에 저장된다. 워크스페이스 루트에는 사람용 작업 폴더가 펼쳐지고, 숨김 디렉터리 `.novel/`에는 상태/로그/메모리 같은 엔진 런타임 데이터가 저장된다.
 운영 원칙은 `1 workspace = 1 novel`이다. 엔진 프로젝트 Git과 소설 작업 Git은 분리한다.
 
@@ -272,6 +301,21 @@ heeforge --workspace ~/novels/my-first-novel --format json --agent status
 ```
 
 `capabilities`는 각 명령의 workspace 필요 여부, Codex 필요 여부, workspace 변경 여부를 JSON으로 알려준다.
+
+## OpenClaw 같은 에이전트
+
+OpenClaw 같은 에이전트에는 다음 규칙을 권장한다.
+
+1. 먼저 `heeforge --format json --agent capabilities`
+2. 다음 `heeforge --workspace <workspace> --format json --agent doctor`
+3. `doctor`가 `ready`가 아니면 `next_steps`와 `remediation`을 그대로 따른다
+4. 준비가 끝난 뒤에만 `status`, `next-scene`, `review`, `rewrite` 같은 변경 명령을 호출한다
+
+중요한 점:
+
+- 현재 auth mode는 `codex_cli`다.
+- 에이전트도 직접 OAuth를 추측하지 말고 `codex login` 전제를 따라야 한다.
+- `schema_version`과 `agent_mode`를 먼저 확인하고 파싱하는 쪽이 안전하다.
 
 `--format json`에서 `init`을 실행하면 interactive prompt를 기다리지 않도록 자동으로 non-interactive 모드로 동작한다. 필요한 필드는 flag 또는 `novel.toml` 편집으로 채운다.
 
