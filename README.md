@@ -52,7 +52,7 @@ curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh | \
-  HEEFORGE_VERSION=v0.1.0 bash
+  HEEFORGE_VERSION=v1.0.0 bash
 ```
 
 설치 스크립트는 현재 플랫폼을 감지하고 GitHub Releases에서 `heeforge-<target>.tar.gz` 자산을 내려받는다.
