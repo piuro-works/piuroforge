@@ -1,5 +1,25 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OperationResult<T> {
+    pub value: T,
+    pub warnings: Vec<String>,
+}
+
+impl<T> OperationResult<T> {
+    pub fn new(value: T) -> Self {
+        Self {
+            value,
+            warnings: Vec::new(),
+        }
+    }
+
+    pub fn warning(mut self, warning: impl Into<String>) -> Self {
+        self.warnings.push(warning.into());
+        self
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StoryState {
     pub current_arc: u32,
@@ -176,8 +196,14 @@ pub struct SceneGenerationLog {
     pub timestamp_unix_secs: u64,
     pub scene_id: String,
     pub planner_output: String,
+    #[serde(default)]
+    pub planner_fallback_warning: Option<String>,
     pub writer_output: String,
+    #[serde(default)]
+    pub writer_fallback_warning: Option<String>,
     pub editor_output: String,
+    #[serde(default)]
+    pub editor_fallback_warning: Option<String>,
     pub final_scene: Scene,
 }
 
@@ -185,6 +211,8 @@ pub struct SceneGenerationLog {
 pub struct ReviewReport {
     pub timestamp_unix_secs: u64,
     pub scene_id: String,
+    #[serde(default)]
+    pub critic_fallback_warning: Option<String>,
     pub issues: Vec<ReviewIssue>,
 }
 
@@ -194,6 +222,8 @@ pub struct RewriteRecord {
     pub scene_id: String,
     pub instruction: String,
     pub revision: u32,
+    #[serde(default)]
+    pub editor_fallback_warning: Option<String>,
     pub original_snapshot_path: String,
     pub rewritten_snapshot_path: String,
 }

@@ -2,7 +2,7 @@
 
 Rust 기반 CLI-first AI 소설 생성 엔진 MVP다. 웹 UI 없이 `heeforge` 명령만으로 scene 생성, 리뷰, 수정, 승인, 상태 확인을 수행한다.
 
-LLM 호출은 직접 OpenAI API 키/OAuth를 다루지 않고, 사용자가 미리 로그인한 `codex` CLI subprocess만 사용한다. 다만 현재 MVP와 테스트를 위해 `codex`가 없거나 로그인되지 않은 경우 dummy fallback을 기본 허용한다.
+LLM 호출은 직접 OpenAI API 키/OAuth를 다루지 않고, 사용자가 미리 로그인한 `codex` CLI subprocess만 사용한다. `codex`가 실패한 경우 기본 동작은 즉시 에러를 반환하는 것이고, dummy fallback은 명시적으로 opt-in 했을 때만 허용한다.
 
 HeeForge CLI UX는 두 가지 출력 모드를 제공한다.
 
@@ -63,6 +63,7 @@ curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh
 
 실제 codex 기반 생성/리뷰/수정을 쓰려면 먼저 `codex login`이 되어 있어야 한다.
 기본적으로 `codex exec` 호출은 120초 timeout이 걸려 있으며, 응답이 없으면 subprocess를 종료하고 명확한 에러를 반환한다.
+기본값에서는 `codex` 실패가 조용히 placeholder prose로 바뀌지 않는다. placeholder output이 필요하면 전역 설정 `allow_dummy_fallback = true` 또는 `HEEFORGE_ALLOW_DUMMY=true`를 사용자가 직접 켜야 하고, 그 경우에도 CLI 출력과 로그에 fallback warning이 남는다.
 
 ## 빌드
 
@@ -257,7 +258,7 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 
 - `HEEFORGE_CODEX_CMD`: 기본값 `codex`
 - `HEEFORGE_CODEX_TIMEOUT_SECS`: 기본값 `120`
-- `HEEFORGE_ALLOW_DUMMY`: 기본값 `true`
+- `HEEFORGE_ALLOW_DUMMY`: 기본값 `false`
 - `HEEFORGE_LOG_PROMPTS`: 기본값 `false`, `true`면 prompt/response 로그를 `.novel/logs/llm_prompts/`에 저장
 - `HEEFORGE_WORKSPACE_AUTO_COMMIT`: 기본값 `false`, `true`면 workspace Git repo를 자동 초기화하고 변경 명령마다 auto-commit
 - `HEEFORGE_INSTALL_DIR`: install script 기본값 `~/.local/bin`

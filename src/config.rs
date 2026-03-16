@@ -302,7 +302,7 @@ fn default_codex_timeout_secs() -> u64 {
 }
 
 fn default_allow_dummy_fallback() -> bool {
-    true
+    false
 }
 
 fn default_default_language() -> String {

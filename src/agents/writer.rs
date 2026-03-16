@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 
-use crate::agents::base::{Agent, AgentContext};
+use crate::agents::base::{fallback_warning, Agent, AgentContext, AgentRun};
 use crate::codex_runner::CodexRunner;
 use crate::prompts::{render_template, WRITER_TEMPLATE};
 
@@ -60,16 +60,24 @@ By the end of the scene, {outcome} The victory was real enough to matter, but in
 }
 
 impl Agent for WriterAgent {
-    fn run(&self, context: &AgentContext) -> Result<String> {
+    fn run(&self, context: &AgentContext) -> Result<AgentRun> {
         if self.use_codex {
             let prompt = self.build_prompt(context)?;
             match self.runner.run_prompt_named("writer", &prompt) {
-                Ok(response) => return Ok(response),
+                Ok(response) => return Ok(AgentRun::direct(response)),
                 Err(error) if !context.allow_dummy_fallback => return Err(error),
-                Err(_) => {}
+                Err(error) => {
+                    return Ok(AgentRun::fallback(
+                        self.dummy_text(context)?,
+                        fallback_warning("writer", &error),
+                    ));
+                }
             }
         }
 
-        self.dummy_text(context)
+        Ok(AgentRun::fallback(
+            self.dummy_text(context)?,
+            "writer used dummy fallback because codex access is disabled by configuration.",
+        ))
     }
 }

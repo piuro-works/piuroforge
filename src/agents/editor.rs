@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 
-use crate::agents::base::{Agent, AgentContext};
+use crate::agents::base::{fallback_warning, Agent, AgentContext, AgentRun};
 use crate::codex_runner::CodexRunner;
 use crate::prompts::{render_template, EDITOR_TEMPLATE};
 
@@ -71,16 +71,24 @@ impl EditorAgent {
 }
 
 impl Agent for EditorAgent {
-    fn run(&self, context: &AgentContext) -> Result<String> {
+    fn run(&self, context: &AgentContext) -> Result<AgentRun> {
         if self.use_codex {
             let prompt = self.build_prompt(context)?;
             match self.runner.run_prompt_named("editor", &prompt) {
-                Ok(response) => return Ok(response),
+                Ok(response) => return Ok(AgentRun::direct(response)),
                 Err(error) if !context.allow_dummy_fallback => return Err(error),
-                Err(_) => {}
+                Err(error) => {
+                    return Ok(AgentRun::fallback(
+                        self.dummy_edit(context)?,
+                        fallback_warning("editor", &error),
+                    ));
+                }
             }
         }
 
-        self.dummy_edit(context)
+        Ok(AgentRun::fallback(
+            self.dummy_edit(context)?,
+            "editor used dummy fallback because codex access is disabled by configuration.",
+        ))
     }
 }

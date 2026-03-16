@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 
-use crate::agents::base::{Agent, AgentContext};
+use crate::agents::base::{fallback_warning, Agent, AgentContext, AgentRun};
 use crate::codex_runner::CodexRunner;
 use crate::prompts::{render_template, PLANNER_TEMPLATE};
 
@@ -61,18 +61,26 @@ impl PlannerAgent {
 }
 
 impl Agent for PlannerAgent {
-    fn run(&self, context: &AgentContext) -> Result<String> {
+    fn run(&self, context: &AgentContext) -> Result<AgentRun> {
         if self.use_codex {
             let prompt = self.build_prompt(context)?;
             match self.runner.run_prompt_named("planner", &prompt) {
-                Ok(response) => return Ok(response),
+                Ok(response) => return Ok(AgentRun::direct(response)),
                 Err(error) if !context.allow_dummy_fallback => return Err(error),
-                Err(_) => {}
+                Err(error) => {
+                    return Ok(AgentRun::fallback(
+                        self.dummy_plan(context),
+                        fallback_warning("planner", &error),
+                    ));
+                }
             }
         }
 
         if context.allow_dummy_fallback {
-            return Ok(self.dummy_plan(context));
+            return Ok(AgentRun::fallback(
+                self.dummy_plan(context),
+                "planner used dummy fallback because codex access is disabled by configuration.",
+            ));
         }
 
         Err(anyhow!("planner agent could not produce a scene plan"))

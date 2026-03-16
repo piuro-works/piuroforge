@@ -8,13 +8,16 @@ use tempfile::tempdir;
 fn init_project_creates_workspace_scaffold() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
-    let engine = test_engine(workspace.clone(), temp_dir.path().join("config-home"))?;
+    let config =
+        Config::with_global_config_dir(workspace.clone(), temp_dir.path().join("config-home"))?;
+    let engine = NovelEngine::new(config)?;
 
     engine.init_project()?;
 
     assert!(temp_dir.path().join("config-home/config.toml").exists());
     let global_config = std::fs::read_to_string(temp_dir.path().join("config-home/config.toml"))?;
     assert!(global_config.contains("codex_command = \"codex\""));
+    assert!(global_config.contains("allow_dummy_fallback = false"));
     assert!(global_config.contains("log_prompts = false"));
     assert!(global_config.contains("workspace_auto_commit = false"));
     assert!(workspace.join(".novel/workspace.json").exists());
@@ -55,7 +58,7 @@ fn generate_next_scene_saves_dummy_scene_markdown() -> Result<()> {
     let engine = test_engine(workspace.clone(), temp_dir.path().join("config-home"))?;
 
     engine.init_project()?;
-    let scene = engine.generate_next_scene()?;
+    let scene = engine.generate_next_scene()?.value;
 
     assert_eq!(scene.id, "scene_001_001");
     let scene_path = scene_file_path(&workspace, "scene_001_001")?;
@@ -138,14 +141,17 @@ fn review_and_rewrite_persist_artifacts() -> Result<()> {
     let engine = test_engine(workspace.clone(), temp_dir.path().join("config-home"))?;
 
     engine.init_project()?;
-    let original = engine.generate_next_scene()?;
+    let original = engine.generate_next_scene()?.value;
 
     let issues = engine.review_current_scene()?;
-    assert!(!issues.is_empty());
+    assert!(!issues.value.is_empty());
     let report = std::fs::read_to_string(workspace.join("06_Review/Feedback/scene_001_001.json"))?;
     assert!(report.contains("\"scene_id\": \"scene_001_001\""));
+    assert!(report.contains("\"critic_fallback_warning\""));
 
-    let rewritten = engine.rewrite_scene("scene_001_001", "Make it darker and sharper")?;
+    let rewritten = engine
+        .rewrite_scene("scene_001_001", "Make it darker and sharper")?
+        .value;
     assert_eq!(rewritten.id, "scene_001_001");
     let history_dir = workspace.join("06_Review/Revisions/scene_001_001");
     assert!(history_dir.join("rewrite_001_original.md").exists());
@@ -270,6 +276,10 @@ fn test_engine(
         "A damaged investigator chases a missing sibling through a city built on edited memories."
             .to_string();
     config.novel_settings.protagonist_name = "Yunseo".to_string();
+    config.allow_dummy_fallback = true;
+    config.global_settings.allow_dummy_fallback = true;
     config.codex_command = "codex-command-for-tests-that-does-not-exist".to_string();
+    config.global_settings.codex_command =
+        "codex-command-for-tests-that-does-not-exist".to_string();
     NovelEngine::new(config)
 }

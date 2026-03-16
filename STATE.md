@@ -23,8 +23,11 @@
 - `.github/workflows/release.yml`가 `v*` tag push 시 release 자산 발행을 담당한다.
 - `next-scene`은 `premise`, `protagonist_name` 등 필수 `novel.toml` 값이 비어 있으면 실패한다.
 - planner/writer/expand-world 프롬프트는 full memory 파일 대신 bounded prompt memory view를 사용해 `story_memory`와 `open_conflicts` 누적을 완화한다.
+- dummy fallback은 기본 비활성화로 전환됐고, opt-in일 때만 허용된다.
 - opt-in prompt logging이 추가되어, 켜면 `.novel/logs/llm_prompts/`에 agent label별 prompt/response JSON 로그를 남긴다.
 - opt-in workspace Git auto-commit이 추가되어, 켜면 workspace repo를 자동 초기화하고 변경 명령 뒤에 자동 commit을 남긴다.
+- `next-scene`, `review`, `rewrite`, `expand-world`는 dummy fallback이 발생하면 성공 응답에도 warning을 노출한다.
+- codex 실패 에러 출력은 로그인 문제와 네트워크/transport 문제를 구분해 remediation을 안내하고, opt-in dummy fallback 설정 경로도 보여준다.
 - planner/writer/editor/critic 프롬프트 템플릿이 `src/prompts/`로 분리됐다.
 - scene 생성 로그는 `.novel/logs/`에, review JSON과 rewrite snapshot은 `06_Review/`에 저장된다.
 - `next-chapter`는 scene 번호 연속성을 검증한다.
@@ -34,6 +37,7 @@
 - 바이너리 테스트가 `rewrite`/`approve`의 JSON 출력, 산출물 보존, 상태 전이를 검증한다.
 - 바이너리 테스트가 `init`, `status`, `next-scene`, `review`, `rewrite`, `approve`, `next-chapter`, `expand-world`, `memory`, `show` 전 커맨드의 JSON 계약을 검증한다.
 - 바이너리 테스트가 `review`의 current scene 부재, `next-chapter`의 empty/gapped chapter, `show`의 미존재 scene 조회 같은 고위험 실패 경로의 JSON 에러 계약도 검증한다.
+- 바이너리 테스트가 기본 codex 실패 시 `codex_unavailable` 에러와 opt-in dummy fallback warning 노출도 검증한다.
 - `NovelEngine`가 scene 생성, 리뷰, 수정, 승인, chapter 컴파일, memory 조회를 오케스트레이션한다.
 - `CodexRunner`는 `codex` CLI subprocess만 사용하도록 구현되어 있다.
 - `StateManager`와 `MemoryManager`가 기본 파일 생성과 로드/저장을 처리한다.
@@ -74,7 +78,7 @@
 
 ## Known Gaps / Risks
 
-- dummy fallback 출력은 결정적이지만 문학적 품질은 낮다.
+- opt-in dummy fallback 출력은 결정적이지만 문학적 품질은 낮다.
 - planner/critic 출력 파서는 기본 fallback이 있으며 schema 강제 수준이 낮다.
 - chapter 승인 정책과 open conflict 해소 정책은 아직 단순하다.
 - 실제 codex 응답 형식이 JSON 규약을 어기면 fallback 동작에 의존하게 된다.

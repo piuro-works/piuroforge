@@ -152,6 +152,7 @@ fn workspace_auto_commit_initializes_repo_and_tracks_mutations() -> Result<()> {
         .arg("json")
         .arg("next-scene")
         .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("HEEFORGE_ALLOW_DUMMY", "true")
         .env("HEEFORGE_WORKSPACE_AUTO_COMMIT", "true")
         .env(
             "HEEFORGE_CODEX_CMD",
@@ -164,6 +165,7 @@ fn workspace_auto_commit_initializes_repo_and_tracks_mutations() -> Result<()> {
     let next_scene_stdout = String::from_utf8(next_scene_output.stdout)?;
     let next_scene_payload: Value = serde_json::from_str(&next_scene_stdout)?;
     assert!(detail_value(&next_scene_payload, "git_commit").is_some());
+    assert!(warning_contains(&next_scene_payload, "dummy fallback"));
     assert_eq!(
         git_stdout(&workspace, ["rev-list", "--count", "HEAD"])?,
         "2"
@@ -172,6 +174,126 @@ fn workspace_auto_commit_initializes_repo_and_tracks_mutations() -> Result<()> {
         git_stdout(&workspace, ["log", "-1", "--pretty=%s"])?,
         "heeforge: draft scene scene_001_001"
     );
+
+    Ok(())
+}
+
+#[test]
+fn next_scene_json_error_when_codex_unavailable_by_default() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("codex-required-novel");
+    let global_dir = temp_dir.path().join("config-home");
+
+    let init_output = Command::new(novel_bin())
+        .arg("--format")
+        .arg("json")
+        .arg("init")
+        .arg(&workspace)
+        .arg("--title")
+        .arg("Codex Required Novel")
+        .arg("--genre")
+        .arg("Mystery")
+        .arg("--tone")
+        .arg("Tense, atmospheric")
+        .arg("--premise")
+        .arg("A damaged investigator chases a missing sibling through a city built on edited memories.")
+        .arg("--protagonist")
+        .arg("Yunseo")
+        .arg("--language")
+        .arg("ko")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(init_output.status.success());
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("next-scene")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env(
+            "HEEFORGE_CODEX_CMD",
+            "codex-command-for-tests-that-does-not-exist",
+        )
+        .output()?;
+
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8(output.stderr)?;
+    let payload: Value = serde_json::from_str(&stderr)?;
+    assert_eq!(payload["status"], "error");
+    assert_eq!(payload["command"], "next-scene");
+    assert_eq!(payload["error_code"], "codex_unavailable");
+    assert!(payload["reason"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("codex"));
+    assert!(payload["remediation"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .any(|item| {
+            item.as_str()
+                .unwrap_or_default()
+                .contains("allow_dummy_fallback = true")
+        }));
+
+    Ok(())
+}
+
+#[test]
+fn next_scene_json_with_opt_in_dummy_fallback_surfaces_warning() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("codex-opt-in-novel");
+    let global_dir = temp_dir.path().join("config-home");
+
+    let init_output = Command::new(novel_bin())
+        .arg("--format")
+        .arg("json")
+        .arg("init")
+        .arg(&workspace)
+        .arg("--title")
+        .arg("Codex Opt In Novel")
+        .arg("--genre")
+        .arg("Mystery")
+        .arg("--tone")
+        .arg("Tense, atmospheric")
+        .arg("--premise")
+        .arg("A damaged investigator chases a missing sibling through a city built on edited memories.")
+        .arg("--protagonist")
+        .arg("Yunseo")
+        .arg("--language")
+        .arg("ko")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(init_output.status.success());
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("next-scene")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("HEEFORGE_ALLOW_DUMMY", "true")
+        .env(
+            "HEEFORGE_CODEX_CMD",
+            "codex-command-for-tests-that-does-not-exist",
+        )
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["command"], "next-scene");
+    assert!(warning_contains(&payload, "planner used dummy fallback"));
+    assert!(warning_contains(&payload, "writer used dummy fallback"));
+    assert!(warning_contains(&payload, "editor used dummy fallback"));
 
     Ok(())
 }
@@ -237,6 +359,7 @@ fn review_json_output_is_structured() -> Result<()> {
     assert_eq!(payload["status"], "ok");
     assert_eq!(payload["command"], "review");
     assert_eq!(detail_value(&payload, "scene_id"), Some("scene_001_001"));
+    assert!(warning_contains(&payload, "critic used dummy fallback"));
     let issue_count = detail_value(&payload, "issue_count")
         .unwrap_or("0")
         .parse::<u32>()?;
@@ -427,6 +550,7 @@ fn next_scene_json_auto_detects_workspace_from_nested_directory() -> Result<()> 
     let payload: Value = serde_json::from_str(&stdout)?;
     assert_eq!(payload["status"], "ok");
     assert_eq!(payload["command"], "next-scene");
+    assert!(warning_contains(&payload, "planner used dummy fallback"));
     assert_same_path(
         payload["workspace"].as_str().unwrap_or_default(),
         &workspace,
@@ -536,6 +660,7 @@ fn rewrite_json_output_preserves_history_and_updates_scene() -> Result<()> {
         detail_value(&payload, "instruction"),
         Some("Make it darker and sharper")
     );
+    assert!(warning_contains(&payload, "editor used dummy fallback"));
     assert!(payload["body"]
         .as_str()
         .unwrap_or_default()
@@ -584,6 +709,10 @@ fn expand_world_json_output_updates_story_memory() -> Result<()> {
     assert_eq!(payload["status"], "ok");
     assert_eq!(payload["command"], "expand-world");
     assert_eq!(detail_value(&payload, "memory_scope"), Some("story_memory"));
+    assert!(warning_contains(
+        &payload,
+        "expand-world used dummy fallback"
+    ));
     assert!(payload["body"]
         .as_str()
         .unwrap_or_default()
@@ -809,7 +938,11 @@ fn ready_engine(
         "A damaged investigator chases a missing sibling through a city built on edited memories."
             .to_string();
     config.novel_settings.protagonist_name = "Yunseo".to_string();
+    config.allow_dummy_fallback = true;
+    config.global_settings.allow_dummy_fallback = true;
     config.codex_command = "codex-command-for-tests-that-does-not-exist".to_string();
+    config.global_settings.codex_command =
+        "codex-command-for-tests-that-does-not-exist".to_string();
     NovelEngine::new(config)
 }
 
@@ -830,6 +963,15 @@ fn detail_value<'a>(payload: &'a Value, label: &str) -> Option<&'a str> {
         .iter()
         .find(|item| item["label"].as_str() == Some(label))
         .and_then(|item| item["value"].as_str())
+}
+
+fn warning_contains(payload: &Value, needle: &str) -> bool {
+    payload["warnings"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|item| item.as_str())
+        .any(|warning| warning.contains(needle))
 }
 
 fn scene_file_path(workspace: &Path, scene_id: &str) -> Result<std::path::PathBuf> {

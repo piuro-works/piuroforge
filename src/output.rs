@@ -192,18 +192,34 @@ impl ErrorOutput {
             };
         }
 
-        if reason.contains("codex login") {
+        if looks_like_codex_error(&reason) {
+            let mut remediation = vec![
+                "Run: codex login".to_string(),
+                "Verify that the codex binary is installed and available on PATH.".to_string(),
+            ];
+            if looks_like_network_error(&reason) {
+                remediation.push(
+                    "Check the current network, DNS, proxy, or VPN path before retrying codex."
+                        .to_string(),
+                );
+            } else {
+                remediation.push(
+                    "Retry after confirming the codex session is healthy and can reach its backend."
+                        .to_string(),
+                );
+            }
+            remediation.push(
+                "If you intentionally want placeholder output, opt in with `allow_dummy_fallback = true` in ~/.config/heeforge/config.toml or `HEEFORGE_ALLOW_DUMMY=true`."
+                    .to_string(),
+            );
+            remediation.push(example_for(command, workspace));
             return Self {
                 status: "error",
                 command: command.to_string(),
                 workspace: workspace_display,
                 error_code: "codex_unavailable".to_string(),
                 reason,
-                remediation: vec![
-                    "Run: codex login".to_string(),
-                    "Verify that the codex binary is installed and available on PATH.".to_string(),
-                    example_for(command, workspace),
-                ],
+                remediation,
                 example_command: Some(example_for(command, workspace)),
                 details: vec![],
             };
@@ -342,4 +358,22 @@ fn example_for(command: &str, workspace: Option<&Path>) -> String {
         Some(path) => format!("heeforge --workspace {} {}", path.display(), command),
         None => format!("heeforge {}", command),
     }
+}
+
+fn looks_like_codex_error(reason: &str) -> bool {
+    reason.contains("codex login")
+        || reason.contains("codex CLI")
+        || reason.contains("chatgpt.com/backend-api/codex")
+}
+
+fn looks_like_network_error(reason: &str) -> bool {
+    let normalized = reason.to_ascii_lowercase();
+    normalized.contains("failed to lookup address information")
+        || normalized.contains("dns")
+        || normalized.contains("network")
+        || normalized.contains("error sending request for url")
+        || normalized.contains("stream disconnected")
+        || normalized.contains("connection reset")
+        || normalized.contains("connection refused")
+        || normalized.contains("timed out")
 }

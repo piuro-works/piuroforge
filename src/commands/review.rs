@@ -4,7 +4,8 @@ use crate::engine::NovelEngine;
 use crate::output::CommandOutput;
 
 pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
-    let issues = engine.review_current_scene()?;
+    let result = engine.review_current_scene()?;
+    let issues = result.value;
     let state = engine.get_status()?;
     let scene_id = state
         .current_scene_id
@@ -21,6 +22,10 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
         .detail("scene_id", scene_id)
         .detail("issue_count", issues.len().to_string())
         .artifact("review_json", &review_path);
+
+    for warning in result.warnings {
+        output = output.warning(warning);
+    }
 
     if issues.is_empty() {
         output = output

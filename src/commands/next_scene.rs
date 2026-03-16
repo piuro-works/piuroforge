@@ -4,11 +4,12 @@ use crate::engine::NovelEngine;
 use crate::output::CommandOutput;
 
 pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
-    let scene = engine.generate_next_scene()?;
+    let result = engine.generate_next_scene()?;
+    let scene = result.value;
     let log_path = engine.scene_generation_log_path(&scene.id);
     let scene_path = engine.scene_markdown_path(&scene.id);
 
-    let output = CommandOutput::ok(
+    let mut output = CommandOutput::ok(
         "next-scene",
         engine.workspace_dir(),
         "Scene generated successfully.",
@@ -27,6 +28,10 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
         &format!("show {}", scene.id),
     ))
     .body(scene.text);
+
+    for warning in result.warnings {
+        output = output.warning(warning);
+    }
 
     Ok(super::finalize_workspace_change(
         engine,

@@ -13,8 +13,8 @@ use crate::codex_runner::CodexRunner;
 use crate::config::Config;
 use crate::memory_manager::MemoryManager;
 use crate::models::{
-    derive_short_title, slug_fragment, MemoryBundle, ReviewIssue, ReviewReport, RewriteRecord,
-    Scene, SceneGenerationLog, ScenePlan, StoryState, WorkspaceManifest,
+    derive_short_title, slug_fragment, MemoryBundle, OperationResult, ReviewIssue, ReviewReport,
+    RewriteRecord, Scene, SceneGenerationLog, ScenePlan, StoryState, WorkspaceManifest,
 };
 use crate::state_manager::StateManager;
 use crate::utils::files::{ensure_dir, list_markdown_files, read_string, write_string};
@@ -79,10 +79,11 @@ impl NovelEngine {
         self.state_manager.load_state()
     }
 
-    pub fn generate_next_scene(&self) -> Result<Scene> {
+    pub fn generate_next_scene(&self) -> Result<OperationResult<Scene>> {
         self.init_project()?;
         self.ensure_generation_ready()?;
 
+        let mut warnings = Vec::new();
         let mut state = self.state_manager.load_state()?;
         let memory = self.memory_manager.load_prompt_bundle()?;
         let (chapter, scene_number, scene_id) = self.state_manager.next_scene_identity(&state);
@@ -97,8 +98,11 @@ impl NovelEngine {
             instruction: None,
             allow_dummy_fallback: self.config.allow_dummy_fallback,
         };
-        let planner_output = planner.run(&planner_context)?;
-        let mut scene_plan = self.parse_scene_plan(&planner_output, chapter, scene_number);
+        let planner_run = planner.run(&planner_context)?;
+        if let Some(warning) = planner_run.fallback_warning.clone() {
+            warnings.push(warning);
+        }
+        let mut scene_plan = self.parse_scene_plan(&planner_run.output, chapter, scene_number);
         scene_plan.chapter = chapter;
         scene_plan.scene_number = scene_number;
 
@@ -112,7 +116,10 @@ impl NovelEngine {
             instruction: None,
             allow_dummy_fallback: self.config.allow_dummy_fallback,
         };
-        let writer_output = writer.run(&writer_context)?;
+        let writer_run = writer.run(&writer_context)?;
+        if let Some(warning) = writer_run.fallback_warning.clone() {
+            warnings.push(warning);
+        }
 
         let draft_scene = Scene {
             id: scene_id,
@@ -122,7 +129,7 @@ impl NovelEngine {
             goal: scene_plan.goal.clone(),
             conflict: scene_plan.conflict.clone(),
             outcome: scene_plan.outcome.clone(),
-            text: writer_output.clone(),
+            text: writer_run.output.clone(),
             status: "draft".to_string(),
         };
 
@@ -136,10 +143,13 @@ impl NovelEngine {
             instruction: None,
             allow_dummy_fallback: self.config.allow_dummy_fallback,
         };
-        let editor_output = editor.run(&editor_context)?;
+        let editor_run = editor.run(&editor_context)?;
+        if let Some(warning) = editor_run.fallback_warning.clone() {
+            warnings.push(warning);
+        }
 
         let final_scene = Scene {
-            text: editor_output.clone(),
+            text: editor_run.output.clone(),
             ..draft_scene
         };
 
@@ -147,9 +157,12 @@ impl NovelEngine {
         self.save_scene_generation_log(SceneGenerationLog {
             timestamp_unix_secs: unix_timestamp_secs(),
             scene_id: final_scene.id.clone(),
-            planner_output,
-            writer_output,
-            editor_output,
+            planner_output: planner_run.output,
+            planner_fallback_warning: planner_run.fallback_warning,
+            writer_output: writer_run.output,
+            writer_fallback_warning: writer_run.fallback_warning,
+            editor_output: editor_run.output,
+            editor_fallback_warning: editor_run.fallback_warning,
             final_scene: final_scene.clone(),
         })?;
         self.state_manager
@@ -161,10 +174,13 @@ impl NovelEngine {
         self.memory_manager
             .append_story_memory(&self.render_story_memory_entry(&final_scene))?;
 
-        Ok(final_scene)
+        Ok(OperationResult {
+            value: final_scene,
+            warnings,
+        })
     }
 
-    pub fn review_current_scene(&self) -> Result<Vec<ReviewIssue>> {
+    pub fn review_current_scene(&self) -> Result<OperationResult<Vec<ReviewIssue>>> {
         self.init_project()?;
 
         let state = self.state_manager.load_state()?;
@@ -185,13 +201,21 @@ impl NovelEngine {
             allow_dummy_fallback: self.config.allow_dummy_fallback,
         };
 
-        let output = critic.run(&context)?;
-        let issues = self.parse_review_issues(&output);
-        self.save_review_report(&scene.id, &issues)?;
-        Ok(issues)
+        let run = critic.run(&context)?;
+        let issues = self.parse_review_issues(&run.output);
+        self.save_review_report(&scene.id, &issues, run.fallback_warning.clone())?;
+        let mut result = OperationResult::new(issues);
+        if let Some(warning) = run.fallback_warning {
+            result = result.warning(warning);
+        }
+        Ok(result)
     }
 
-    pub fn rewrite_scene(&self, scene_id: &str, instruction: &str) -> Result<Scene> {
+    pub fn rewrite_scene(
+        &self,
+        scene_id: &str,
+        instruction: &str,
+    ) -> Result<OperationResult<Scene>> {
         self.init_project()?;
 
         let state = self.state_manager.load_state()?;
@@ -208,14 +232,14 @@ impl NovelEngine {
             allow_dummy_fallback: self.config.allow_dummy_fallback,
         };
 
-        let rewritten_text = editor.run(&context)?;
+        let run = editor.run(&context)?;
         let revision = self.next_rewrite_revision(scene_id)?;
         let original_snapshot_path = self.rewrite_snapshot_path(scene_id, revision, "original");
         let rewritten_snapshot_path = self.rewrite_snapshot_path(scene_id, revision, "rewritten");
         write_string(&original_snapshot_path, &render_scene(&existing_scene))?;
 
         let rewritten_scene = Scene {
-            text: rewritten_text,
+            text: run.output.clone(),
             status: "draft".to_string(),
             ..existing_scene
         };
@@ -227,6 +251,7 @@ impl NovelEngine {
             scene_id: scene_id.to_string(),
             instruction: instruction.to_string(),
             revision,
+            editor_fallback_warning: run.fallback_warning.clone(),
             original_snapshot_path: self.workspace_relative_path(&original_snapshot_path),
             rewritten_snapshot_path: self.workspace_relative_path(&rewritten_snapshot_path),
         })?;
@@ -242,7 +267,12 @@ impl NovelEngine {
             instruction
         ))?;
 
-        Ok(rewritten_scene)
+        let mut result = OperationResult::new(rewritten_scene);
+        if let Some(warning) = run.fallback_warning {
+            result = result.warning(warning);
+        }
+
+        Ok(result)
     }
 
     pub fn approve_scene(&self, scene_id: &str) -> Result<()> {
@@ -291,7 +321,7 @@ impl NovelEngine {
         Ok(chapter_path)
     }
 
-    pub fn expand_world(&self) -> Result<String> {
+    pub fn expand_world(&self) -> Result<OperationResult<String>> {
         self.init_project()?;
 
         let memory = self.memory_manager.load_prompt_bundle()?;
@@ -304,16 +334,29 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
             active = memory.active_memory,
         );
 
-        let expansion = match self.codex_runner.run_prompt_named("expand-world", &prompt) {
-            Ok(response) => response,
+        let (expansion, fallback_warning) = match self.codex_runner.run_prompt_named(
+            "expand-world",
+            &prompt,
+        ) {
+            Ok(response) => (response, None),
             Err(error) if !self.config.allow_dummy_fallback => return Err(error),
-            Err(_) => "# World Expansion\n\n- A hidden civic pact binds the city guilds to a forgotten disaster beneath the harbor.\n- Anyone who breaks the pact inherits both political leverage and mortal risk.\n".to_string(),
+            Err(error) => (
+                "# World Expansion\n\n- A hidden civic pact binds the city guilds to a forgotten disaster beneath the harbor.\n- Anyone who breaks the pact inherits both political leverage and mortal risk.\n".to_string(),
+                Some(format!(
+                    "expand-world used dummy fallback because codex failed: {}",
+                    compact_error_message(&error)
+                )),
+            ),
         };
 
         self.memory_manager
             .append_story_memory(&format!("## World Expansion\n{}\n", expansion.trim()))?;
 
-        Ok(expansion)
+        let mut result = OperationResult::new(expansion);
+        if let Some(warning) = fallback_warning {
+            result = result.warning(warning);
+        }
+        Ok(result)
     }
 
     pub fn get_memory(&self) -> Result<MemoryBundle> {
@@ -496,10 +539,16 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
         write_string(&path, &content)
     }
 
-    fn save_review_report(&self, scene_id: &str, issues: &[ReviewIssue]) -> Result<()> {
+    fn save_review_report(
+        &self,
+        scene_id: &str,
+        issues: &[ReviewIssue],
+        critic_fallback_warning: Option<String>,
+    ) -> Result<()> {
         let report = ReviewReport {
             timestamp_unix_secs: unix_timestamp_secs(),
             scene_id: scene_id.to_string(),
+            critic_fallback_warning,
             issues: issues.to_vec(),
         };
         let path = self.review_report_path(scene_id);
@@ -811,4 +860,27 @@ fn unix_timestamp_secs() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs())
         .unwrap_or(0)
+}
+
+fn compact_error_message(error: &anyhow::Error) -> String {
+    let flattened = error
+        .to_string()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    truncate_chars(flattened.trim(), 220)
+}
+
+fn truncate_chars(value: &str, max_chars: usize) -> String {
+    let mut rendered = String::new();
+    for ch in value.chars().take(max_chars) {
+        rendered.push(ch);
+    }
+
+    if value.chars().count() <= max_chars {
+        rendered
+    } else {
+        format!("{}...", rendered.trim_end())
+    }
 }
