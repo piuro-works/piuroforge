@@ -11,6 +11,7 @@ const CLI_AFTER_HELP: &str = "\
 Quickstart:
   heeforge init ~/novels/my-book
   cd ~/novels/my-book
+  heeforge doctor
   heeforge next-scene
   heeforge review
 
@@ -30,6 +31,12 @@ const STATUS_AFTER_HELP: &str = "\
 Examples:
   heeforge status
   heeforge --workspace ~/novels/my-book --format json status
+";
+
+const DOCTOR_AFTER_HELP: &str = "\
+Examples:
+  heeforge doctor
+  heeforge --workspace ~/novels/my-book --format json doctor
 ";
 
 const NEXT_SCENE_AFTER_HELP: &str = "\
@@ -121,6 +128,11 @@ enum NovelCommand {
     )]
     Status,
     #[command(
+        about = "Diagnose workspace setup, Codex connectivity, and draft readiness.",
+        after_long_help = DOCTOR_AFTER_HELP
+    )]
+    Doctor,
+    #[command(
         about = "Generate the next scene by running planner, writer, and editor.",
         after_long_help = NEXT_SCENE_AFTER_HELP
     )]
@@ -171,6 +183,7 @@ impl NovelCommand {
         match self {
             Self::Init(_) => "init",
             Self::Status => "status",
+            Self::Doctor => "doctor",
             Self::NextScene => "next-scene",
             Self::Review => "review",
             Self::Rewrite { .. } => "rewrite",
@@ -220,6 +233,10 @@ fn run(cli: Cli) -> Result<CommandOutput> {
         NovelCommand::Status => {
             let engine = NovelEngine::new(Config::new(workspace)?)?;
             commands::status::run(&engine)
+        }
+        NovelCommand::Doctor => {
+            let config = Config::new(workspace)?;
+            commands::doctor::run(&config)
         }
         NovelCommand::NextScene => {
             let engine = NovelEngine::new(Config::new(workspace)?)?;

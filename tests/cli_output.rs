@@ -17,6 +17,7 @@ fn help_mentions_json_output_and_examples() -> Result<()> {
     assert!(stdout.contains("--format"));
     assert!(stdout.contains("Use `json` for Codex CLI"));
     assert!(stdout.contains("Quickstart:"));
+    assert!(stdout.contains("heeforge doctor"));
     assert!(stdout.contains("heeforge --workspace ~/novels/my-book --format json status"));
 
     Ok(())
@@ -55,6 +56,50 @@ fn status_json_output_is_structured() -> Result<()> {
         .contains("Workspace"));
     assert!(payload["details"].is_array());
     assert!(payload["next_steps"].is_array());
+
+    Ok(())
+}
+
+#[test]
+fn doctor_json_reports_setup_issues_without_workspace() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("doctor-novel");
+    let global_dir = temp_dir.path().join("config-home");
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("doctor")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env(
+            "HEEFORGE_CODEX_CMD",
+            "codex-command-for-tests-that-does-not-exist",
+        )
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["command"], "doctor");
+    assert_eq!(detail_value(&payload, "workspace_ready"), Some("no"));
+    assert_eq!(detail_value(&payload, "codex_cli"), Some("missing"));
+    assert_eq!(detail_value(&payload, "codex_connection"), Some("missing"));
+    assert!(warning_contains(&payload, "No HeeForge workspace marker"));
+    assert!(warning_contains(&payload, "Codex CLI was not found"));
+    assert!(payload["next_steps"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .any(|item| item.as_str().unwrap_or_default().contains("heeforge init")));
+    assert!(payload["next_steps"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .any(|item| item.as_str().unwrap_or_default().contains("codex login")));
 
     Ok(())
 }
@@ -100,6 +145,11 @@ fn init_json_creates_ready_workspace_without_prompting() -> Result<()> {
         detail_value(&payload, "writer_setup"),
         Some("Run `codex login` once before your first real scene. Leave dummy fallback off unless you intentionally want placeholder text.")
     );
+    assert!(payload["next_steps"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .any(|item| item.as_str().unwrap_or_default().contains("doctor")));
     assert!(workspace.join("novel.toml").exists());
     assert!(workspace.join("README.md").exists());
     assert!(workspace.join("98_Templates/Scene Template.md").exists());

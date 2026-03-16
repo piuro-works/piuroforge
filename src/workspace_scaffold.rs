@@ -103,9 +103,10 @@ fn workspace_root_readme(title: &str) -> String {
 This workspace separates human-facing manuscript files from HeeForge runtime data.\n\n\
 ## First Run Checklist\n\n\
 1. Open a terminal once and run `codex login`.\n\
-2. Open `~/.config/heeforge/config.toml` if you want to review your HeeForge settings.\n\
-3. Leave `allow_dummy_fallback = false` for real drafting. Turn it on only if you intentionally want placeholder text while testing the folder workflow.\n\
-4. If you want automatic Git history for this novel workspace, turn on `workspace_auto_commit = true` in the same config file.\n\n\
+2. Run `heeforge doctor` in this workspace before the first real scene.\n\
+3. Open `~/.config/heeforge/config.toml` if you want to review your HeeForge settings.\n\
+4. Leave `allow_dummy_fallback = false` for real drafting. Turn it on only if you intentionally want placeholder text while testing the folder workflow.\n\
+5. If you want automatic Git history for this novel workspace, turn on `workspace_auto_commit = true` in the same config file.\n\n\
 If `next-scene` fails with `codex_unavailable`, that usually means either `codex login` is not finished yet or this machine cannot reach the Codex service because of internet, DNS, VPN, or proxy issues.\n\n\
 ## Human Folders\n\n\
 - `00_Inbox/`: raw captures, scraps, and external notes\n\

@@ -101,6 +101,7 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
             engine.workspace_dir(),
             "Novel workspace initialized and ready for scene generation.",
         )
+        .next_step(super::workspace_command(engine, "doctor"))
         .next_step("codex login")
         .next_step(format!("Open {}", engine.global_config_path().display()))
         .next_step(super::workspace_command(engine, "next-scene"));
@@ -119,6 +120,7 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
             "Missing required novel config: {}",
             missing.join(", ")
         ))
+        .next_step(super::workspace_command(engine, "doctor"))
         .next_step(format!("Edit {}", engine.workspace_config_path().display()))
         .next_step(super::workspace_command(engine, "next-scene"))
     };

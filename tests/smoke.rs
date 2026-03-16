@@ -36,6 +36,7 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
     let workspace_readme = std::fs::read_to_string(workspace.join("README.md"))?;
     assert!(workspace_readme.contains("This workspace separates human-facing manuscript files"));
     assert!(workspace_readme.contains("First Run Checklist"));
+    assert!(workspace_readme.contains("heeforge doctor"));
     assert!(workspace_readme.contains("allow_dummy_fallback = false"));
     let draft_readme = std::fs::read_to_string(workspace.join("02_Draft/README.md"))?;
     assert!(draft_readme.contains("Human-facing manuscript work lives here."));

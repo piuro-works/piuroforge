@@ -69,9 +69,10 @@ curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh
 
 1. 터미널에서 한 번 `codex login` 실행
 2. `heeforge init <workspace>` 실행
-3. 필요하면 `~/.config/heeforge/config.toml` 열기
-4. 실제 집필은 `allow_dummy_fallback = false` 유지
-5. 폴더 흐름만 시험하고 싶을 때만 `allow_dummy_fallback = true` 사용
+3. 워크스페이스에서 `heeforge doctor` 실행
+4. 필요하면 `~/.config/heeforge/config.toml` 열기
+5. 실제 집필은 `allow_dummy_fallback = false` 유지
+6. 폴더 흐름만 시험하고 싶을 때만 `allow_dummy_fallback = true` 사용
 
 `codex_unavailable`가 나오면 대부분은 로그인 미완료 또는 인터넷/DNS/VPN/프록시 문제다. 이 경우 개발 지식보다도 먼저 `codex login`과 네트워크 상태를 확인하는 쪽이 맞다.
 
@@ -218,6 +219,7 @@ Git을 잘 모르는 사용자라면 전역 설정 `workspace_auto_commit = true
 ```bash
 cd ~/novels/my-first-novel
 heeforge status
+heeforge doctor
 heeforge next-scene
 heeforge review
 heeforge rewrite scene_001_001 --instruction "대사를 더 날카롭게"

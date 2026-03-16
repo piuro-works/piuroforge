@@ -6,6 +6,7 @@
 
 - `heeforge` Rust 크레이트가 생성되어 있다.
 - CLI command 집합이 `src/main.rs`와 `src/commands/`에 구현되어 있다.
+- `doctor` 명령이 workspace 상태, 필수 novel 설정, Codex 연결, fallback 설정을 진단한다.
 - 워크스페이스 기반 저장 모델이 적용되어 사람용 소설 데이터는 워크스페이스 루트의 numbered folder에, 엔진 런타임 데이터는 `.novel/`에 분리 저장된다.
 - `1 workspace = 1 novel` 정책을 문서와 초기화 로직에 반영했다.
 - `heeforge init`은 소설 워크스페이스용 `.gitignore`를 생성해 엔진 Git과 소설 Git 분리를 돕는다.
@@ -30,6 +31,7 @@
 - `next-scene`, `review`, `rewrite`, `expand-world`는 dummy fallback이 발생하면 성공 응답에도 warning을 노출한다.
 - codex 실패 에러 출력은 로그인 문제와 네트워크/transport 문제를 구분해 remediation을 안내하고, opt-in dummy fallback 설정 경로도 보여준다.
 - `init` 출력과 workspace root `README.md`는 `codex login`, dummy fallback, workspace auto-commit 설정 순서를 비개발자 기준으로 안내한다.
+- `doctor`는 workspace 밖에서도 실행 가능하며, `codex login`, `novel.toml`, 네트워크 점검, dummy fallback 설정 경로를 다음 액션으로 안내한다.
 - planner/writer/editor/critic 프롬프트 템플릿이 `src/prompts/`로 분리됐다.
 - scene 생성 로그는 `.novel/logs/`에, review JSON과 rewrite snapshot은 `06_Review/`에 저장된다.
 - `next-chapter`는 scene 번호 연속성을 검증한다.
@@ -91,5 +93,5 @@
 ## Recommended Next Actions
 
 1. planner/writer/editor/critic에 대한 fixture 기반 테스트를 추가한다.
-2. `doctor` 명령을 추가해 사용자 친화적 진단과 remediation 출력을 강화한다.
+2. `doctor` 명령에 더 자세한 플랫폼별 네트워크 점검 가이드를 추가한다.
 3. tag release 한 번을 실제로 발행해 `install.sh`가 원격 Release 경로에서도 정상 동작하는지 검증한다.

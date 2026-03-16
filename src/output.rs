@@ -209,6 +209,7 @@ impl ErrorOutput {
                 "If you only want to test the writing workflow without live Codex, open ~/.config/heeforge/config.toml and set allow_dummy_fallback = true. HeeForge will then mark placeholder output with warnings."
                     .to_string(),
             );
+            remediation.push(example_for("doctor", workspace));
             remediation.push(example_for(command, workspace));
             return Self {
                 status: "error",

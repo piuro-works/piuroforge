@@ -43,6 +43,7 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
                 "Missing required novel config: {}",
                 missing.join(", ")
             ))
+            .next_step(super::workspace_command(engine, "doctor"))
             .next_step(format!("Edit {}", engine.workspace_config_path().display()));
     } else if let Some(scene_id) = state.current_scene_id.as_deref() {
         output = output
@@ -50,9 +51,12 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
                 engine,
                 &format!("show {scene_id}"),
             ))
+            .next_step(super::workspace_command(engine, "doctor"))
             .next_step(super::workspace_command(engine, "review"));
     } else {
-        output = output.next_step(super::workspace_command(engine, "next-scene"));
+        output = output
+            .next_step(super::workspace_command(engine, "doctor"))
+            .next_step(super::workspace_command(engine, "next-scene"));
     }
 
     Ok(output)
