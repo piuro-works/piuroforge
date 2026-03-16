@@ -39,6 +39,7 @@
 - planner/writer/editor/critic 프롬프트 템플릿이 `src/prompts/`로 분리됐다.
 - planner/writer/editor/critic은 이제 scene의 `chapter_role`과 character voice guide를 함께 사용해 장면 역할과 대화 톤을 더 직접적으로 통제한다.
 - planner/writer/editor/critic은 `03_StoryBible/Voice/`의 safe style guide도 읽어 프로젝트 전체 문체를 descriptive traits와 genre/tone guidance 기준으로 맞춘다.
+- story foundation은 이제 agent별 view로 분리되어, planner/writer/editor/critic/world expansion이 서로 다른 canon slice를 받아 컨텍스트 폭주를 줄인다.
 - scene 생성 로그는 `.novel/logs/`에, review JSON과 rewrite snapshot은 `06_Review/`에 저장된다.
 - `next-chapter`는 scene 번호 연속성을 검증한다.
 - `next-scene`은 현재 chapter가 `chapter_scene_target`에 도달하면 추가 scene 생성을 막고, `next-chapter`는 scene 수가 target과 맞지 않으면 컴파일을 거부한다.

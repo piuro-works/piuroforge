@@ -102,7 +102,9 @@ impl NovelEngine {
             state: state.clone(),
             novel: self.config.novel_settings.clone(),
             memory: memory.clone(),
-            story_foundation: foundation.prompt_context.clone(),
+            planner_story_foundation: foundation.views.planner.clone(),
+            writer_story_foundation: foundation.views.writer.clone(),
+            editor_story_foundation: foundation.views.editor.clone(),
             chapter,
             scene_number,
             scene_id,
@@ -157,7 +159,7 @@ impl NovelEngine {
             state,
             novel: self.config.novel_settings.clone(),
             memory,
-            story_foundation: foundation.prompt_context,
+            critic_story_foundation: foundation.views.critic,
             allow_dummy_fallback: self.config.allow_dummy_fallback,
             scene,
         })?;
@@ -192,7 +194,7 @@ impl NovelEngine {
             state: state.clone(),
             novel: self.config.novel_settings.clone(),
             memory,
-            story_foundation: foundation.prompt_context,
+            editor_story_foundation: foundation.views.editor,
             scene: existing_scene.clone(),
             instruction: instruction.to_string(),
             allow_dummy_fallback: self.config.allow_dummy_fallback,
@@ -286,7 +288,7 @@ impl NovelEngine {
         let foundation = self.load_story_foundation_bundle()?;
         let expanded = self.backend.expand_world(WorldExpansionRequest {
             memory,
-            story_foundation: foundation.prompt_context,
+            world_story_foundation: foundation.views.world,
             allow_dummy_fallback: self.config.allow_dummy_fallback,
         })?;
 

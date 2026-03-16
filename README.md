@@ -85,6 +85,7 @@ curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh
 `status`와 `next-scene`은 이제 workspace의 브리프/바이블/플롯 문서를 읽어 준비도를 계산한다. 준비도가 낮으면 경고를 보여주고, planner/writer/editor/critic도 그 문서들을 실제 프롬프트에 사용한다.
 특히 character 문서의 `Voice Notes`, `Speech Rhythm`, `Favorite Diction`, `Taboo Phrases`, `Emotional Leakage`, `Non-Negotiable Invariants` 섹션은 별도 voice guide로 추출돼 dialogue consistency에 직접 반영된다.
 프로젝트 전체 문체는 `03_StoryBible/Voice/` 아래 문서에서 읽는다. 여기에는 작가 이름이 아니라 문체 특징, 장르 스타일, 톤, narrative voice를 적는 쪽이 맞다.
+또한 이 문서들은 agent별로 그대로 전부 복사되지 않는다. planner/writer/editor/critic/world expansion은 각자 필요한 foundation view만 받아서 컨텍스트 비대화를 줄인다.
 
 ## 빌드
 

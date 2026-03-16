@@ -14,7 +14,17 @@ const FILE_EXCERPT_LIMIT: usize = 1_200;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoryFoundationBundle {
     pub prompt_context: String,
+    pub views: StoryFoundationViews,
     pub status: StoryFoundationStatus,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoryFoundationViews {
+    pub planner: String,
+    pub writer: String,
+    pub editor: String,
+    pub critic: String,
+    pub world: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,7 +110,7 @@ pub fn load_story_foundation(workspace_dir: &Path) -> Result<StoryFoundationBund
         ),
     };
 
-    let prompt_context = render_prompt_context(
+    let sections = render_foundation_sections(
         workspace_dir,
         &status,
         &brief_docs,
@@ -110,9 +120,12 @@ pub fn load_story_foundation(workspace_dir: &Path) -> Result<StoryFoundationBund
         &voice_docs,
         &research_docs,
     )?;
+    let prompt_context = render_prompt_context(&sections);
+    let views = render_foundation_views(&sections);
 
     Ok(StoryFoundationBundle {
         prompt_context,
+        views,
         status,
     })
 }
@@ -180,7 +193,19 @@ fn missing_items(
     missing
 }
 
-fn render_prompt_context(
+struct RenderedFoundationSections {
+    overview: String,
+    brief: String,
+    narrative_style_guide: String,
+    character_voice_guide: String,
+    characters: String,
+    world: String,
+    plot: String,
+    voice_docs: String,
+    research: String,
+}
+
+fn render_foundation_sections(
     workspace_dir: &Path,
     status: &StoryFoundationStatus,
     brief_docs: &[PathBuf],
@@ -189,7 +214,7 @@ fn render_prompt_context(
     plot_docs: &[PathBuf],
     voice_docs: &[PathBuf],
     research_docs: &[PathBuf],
-) -> Result<String> {
+) -> Result<RenderedFoundationSections> {
     let missing = if status.missing_items.is_empty() {
         "None".to_string()
     } else {
@@ -198,28 +223,122 @@ fn render_prompt_context(
     let character_voice_guide = render_character_voice_guide(workspace_dir, character_docs)?;
     let narrative_style_guide = render_narrative_style_guide(workspace_dir, voice_docs)?;
 
-    Ok(format!(
-        "Story foundation score: {score}/100 ({level})\nMissing foundation items: {missing}\n\n\
-Project brief excerpts:\n{brief}\n\n\
-Narrative style guide:\n{style}\n\n\
-Character voice guide:\n{voice}\n\n\
-Character bible excerpts:\n{characters}\n\n\
-World and rule excerpts:\n{world}\n\n\
-Plot outline excerpts:\n{plot}\n\n\
-Voice and tone excerpts:\n{voice_docs}\n\n\
-Research excerpts:\n{research}",
-        score = status.score,
-        level = status.level(),
-        missing = missing,
-        brief = render_section(workspace_dir, brief_docs, BRIEF_SECTION_LIMIT)?,
-        style = narrative_style_guide,
-        voice = character_voice_guide,
-        characters = render_section(workspace_dir, character_docs, BIBLE_SECTION_LIMIT)?,
-        world = render_section(workspace_dir, world_docs, BIBLE_SECTION_LIMIT)?,
-        plot = render_section(workspace_dir, plot_docs, PLOT_SECTION_LIMIT)?,
-        voice_docs = render_section(workspace_dir, voice_docs, VOICE_SECTION_LIMIT)?,
-        research = render_section(workspace_dir, research_docs, RESEARCH_SECTION_LIMIT)?,
-    ))
+    Ok(RenderedFoundationSections {
+        overview: format!(
+            "Story foundation score: {score}/100 ({level})\nMissing foundation items: {missing}",
+            score = status.score,
+            level = status.level(),
+            missing = missing,
+        ),
+        brief: render_section(workspace_dir, brief_docs, BRIEF_SECTION_LIMIT)?,
+        narrative_style_guide,
+        character_voice_guide,
+        characters: render_section(workspace_dir, character_docs, BIBLE_SECTION_LIMIT)?,
+        world: render_section(workspace_dir, world_docs, BIBLE_SECTION_LIMIT)?,
+        plot: render_section(workspace_dir, plot_docs, PLOT_SECTION_LIMIT)?,
+        voice_docs: render_section(workspace_dir, voice_docs, VOICE_SECTION_LIMIT)?,
+        research: render_section(workspace_dir, research_docs, RESEARCH_SECTION_LIMIT)?,
+    })
+}
+
+fn render_prompt_context(sections: &RenderedFoundationSections) -> String {
+    render_foundation_view(&[
+        ("Foundation overview", sections.overview.as_str()),
+        ("Project brief excerpts", sections.brief.as_str()),
+        (
+            "Narrative style guide",
+            sections.narrative_style_guide.as_str(),
+        ),
+        (
+            "Character voice guide",
+            sections.character_voice_guide.as_str(),
+        ),
+        ("Character bible excerpts", sections.characters.as_str()),
+        ("World and rule excerpts", sections.world.as_str()),
+        ("Plot outline excerpts", sections.plot.as_str()),
+        ("Voice and tone excerpts", sections.voice_docs.as_str()),
+        ("Research excerpts", sections.research.as_str()),
+    ])
+}
+
+fn render_foundation_views(sections: &RenderedFoundationSections) -> StoryFoundationViews {
+    StoryFoundationViews {
+        planner: render_foundation_view(&[
+            ("Foundation overview", sections.overview.as_str()),
+            ("Project brief excerpts", sections.brief.as_str()),
+            (
+                "Narrative style guide",
+                sections.narrative_style_guide.as_str(),
+            ),
+            (
+                "Character voice guide",
+                sections.character_voice_guide.as_str(),
+            ),
+            ("World and rule excerpts", sections.world.as_str()),
+            ("Plot outline excerpts", sections.plot.as_str()),
+        ]),
+        writer: render_foundation_view(&[
+            ("Foundation overview", sections.overview.as_str()),
+            (
+                "Narrative style guide",
+                sections.narrative_style_guide.as_str(),
+            ),
+            (
+                "Character voice guide",
+                sections.character_voice_guide.as_str(),
+            ),
+            ("Project brief excerpts", sections.brief.as_str()),
+            ("World and rule excerpts", sections.world.as_str()),
+            ("Plot outline excerpts", sections.plot.as_str()),
+        ]),
+        editor: render_foundation_view(&[
+            ("Foundation overview", sections.overview.as_str()),
+            (
+                "Narrative style guide",
+                sections.narrative_style_guide.as_str(),
+            ),
+            (
+                "Character voice guide",
+                sections.character_voice_guide.as_str(),
+            ),
+            ("World and rule excerpts", sections.world.as_str()),
+            ("Plot outline excerpts", sections.plot.as_str()),
+        ]),
+        critic: render_foundation_view(&[
+            ("Foundation overview", sections.overview.as_str()),
+            (
+                "Narrative style guide",
+                sections.narrative_style_guide.as_str(),
+            ),
+            (
+                "Character voice guide",
+                sections.character_voice_guide.as_str(),
+            ),
+            ("World and rule excerpts", sections.world.as_str()),
+            ("Plot outline excerpts", sections.plot.as_str()),
+        ]),
+        world: render_foundation_view(&[
+            ("Foundation overview", sections.overview.as_str()),
+            ("Project brief excerpts", sections.brief.as_str()),
+            (
+                "Narrative style guide",
+                sections.narrative_style_guide.as_str(),
+            ),
+            ("World and rule excerpts", sections.world.as_str()),
+            ("Plot outline excerpts", sections.plot.as_str()),
+            ("Voice and tone excerpts", sections.voice_docs.as_str()),
+            ("Research excerpts", sections.research.as_str()),
+        ]),
+    }
+}
+
+fn render_foundation_view(sections: &[(&str, &str)]) -> String {
+    let mut rendered = Vec::new();
+    for (label, body) in sections {
+        rendered.push(format!("{label}:\n{}", body.trim()));
+    }
+
+    rendered.join("\n\n")
 }
 
 fn render_narrative_style_guide(workspace_dir: &Path, docs: &[PathBuf]) -> Result<String> {
@@ -683,6 +802,56 @@ mod tests {
         assert!(bundle
             .prompt_context
             .contains("Safe style note: 작가 이름 대신 문체 특징과 장르 기대치를 사용한다."));
+
+        Ok(())
+    }
+
+    #[test]
+    fn agent_specific_views_keep_only_relevant_sections() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let workspace = temp_dir.path();
+        fs::create_dir_all(workspace.join("01_Brief"))?;
+        fs::create_dir_all(workspace.join("03_StoryBible/Characters"))?;
+        fs::create_dir_all(workspace.join("03_StoryBible/World"))?;
+        fs::create_dir_all(workspace.join("03_StoryBible/Plot"))?;
+        fs::create_dir_all(workspace.join("03_StoryBible/Voice"))?;
+        fs::create_dir_all(workspace.join("04_Research/Notes"))?;
+        fs::write(
+            workspace.join("01_Brief/Brief.md"),
+            "The novel promises a tense investigation inside a city archive.",
+        )?;
+        fs::write(
+            workspace.join("03_StoryBible/Characters/Lead.md"),
+            "# Character\n\n## Character ID\nSeorin\n\n## Voice Notes\nShort and exact.\n",
+        )?;
+        fs::write(
+            workspace.join("03_StoryBible/World/Archive.md"),
+            "The archive is half sacred bureaucracy, half surveillance maze.",
+        )?;
+        fs::write(
+            workspace.join("03_StoryBible/Plot/Arc One.md"),
+            "Chapter one begins with a missing record and ends with a compromised witness.",
+        )?;
+        fs::write(
+            workspace.join("03_StoryBible/Voice/Style.md"),
+            "# Style Guide\n\n## Style Principles\nKeep sentences lean.\n",
+        )?;
+        fs::write(
+            workspace.join("04_Research/Notes/Harbor.md"),
+            "A note about freight manifests and harbor timing.",
+        )?;
+
+        let bundle = load_story_foundation(workspace)?;
+
+        assert!(bundle.views.planner.contains("Plot outline excerpts:"));
+        assert!(bundle.views.planner.contains("Project brief excerpts:"));
+        assert!(!bundle.views.planner.contains("Research excerpts:"));
+        assert!(bundle.views.writer.contains("Character voice guide:"));
+        assert!(!bundle.views.writer.contains("Research excerpts:"));
+        assert!(bundle.views.editor.contains("Narrative style guide:"));
+        assert!(!bundle.views.editor.contains("Project brief excerpts:"));
+        assert!(bundle.views.world.contains("Research excerpts:"));
+        assert!(!bundle.views.world.contains("Character bible excerpts:"));
 
         Ok(())
     }
