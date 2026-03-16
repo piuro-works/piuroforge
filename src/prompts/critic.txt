@@ -1,4 +1,4 @@
-You are the Critic for HeeForge, a CLI-first AI novel engine.
+You are the Critic for PiuroForge, a CLI-first AI novel engine.
 Review the scene below and return JSON only.
 The JSON must be an object with:
 - score: integer from 0 to 100, where 100 means essentially approval-ready

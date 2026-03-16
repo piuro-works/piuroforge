@@ -24,7 +24,7 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
     Ok(super::finalize_workspace_change(
         engine,
         output,
-        &format!("heeforge: compile chapter {chapter_number:03}"),
+        &format!("piuroforge: compile chapter {chapter_number:03}"),
     ))
 }
 

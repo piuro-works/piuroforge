@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BINARY_NAME="heeforge"
-DEFAULT_REPO="johwanghee/heeforge"
+BINARY_NAME="piuroforge"
+DEFAULT_REPO="piuro-works/piuroforge"
 DEFAULT_INSTALL_DIR="${HOME}/.local/bin"
 
 log() {
@@ -97,10 +97,10 @@ detect_target() {
 asset_url() {
   local archive_name="$1"
   local version="$2"
-  local repo="${HEEFORGE_REPO:-$DEFAULT_REPO}"
+  local repo="${PIUROFORGE_REPO:-$DEFAULT_REPO}"
 
-  if [ -n "${HEEFORGE_DOWNLOAD_URL:-}" ]; then
-    printf '%s\n' "$HEEFORGE_DOWNLOAD_URL"
+  if [ -n "${PIUROFORGE_DOWNLOAD_URL:-}" ]; then
+    printf '%s\n' "$PIUROFORGE_DOWNLOAD_URL"
     return 0
   fi
 
@@ -118,8 +118,8 @@ main() {
   need_cmd mktemp
   need_cmd install
 
-  local install_dir="${HEEFORGE_INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
-  local version="${HEEFORGE_VERSION:-latest}"
+  local install_dir="${PIUROFORGE_INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+  local version="${PIUROFORGE_VERSION:-latest}"
   local target
   local archive_name
   local download_url

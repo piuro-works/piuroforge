@@ -2,7 +2,7 @@
 
 ## Purpose
 
-이 프로젝트는 Rust 기반 CLI-first AI 소설 작성 프레임워크다. CLI 실행 이름은 `heeforge`이며, 모든 변경은 웹 UI가 아니라 CLI 워크플로를 우선해야 한다.
+이 프로젝트는 Rust 기반 CLI-first AI 소설 작성 프레임워크다. CLI 실행 이름은 `piuroforge`이며, 모든 변경은 웹 UI가 아니라 CLI 워크플로를 우선해야 한다.
 
 ## Hard Constraints
 
@@ -20,7 +20,7 @@
 - 에이전트 역할 분리는 `src/agents/`에서 유지한다.
 - 워크스페이스 정책은 `1 workspace = 1 novel`이다.
 - 엔진 프로젝트 Git과 소설 워크스페이스 Git은 별개로 취급한다.
-- 전역 런타임 설정은 `~/.config/heeforge/config.toml`에 둔다.
+- 전역 런타임 설정은 `~/.config/piuroforge/config.toml`에 둔다.
 - 소설별 설정은 워크스페이스 루트의 `novel.toml`에 둔다.
 - `.novel/workspace.json`은 엔진 내부 메타만 담는다.
 - 사람용 작업 데이터는 워크스페이스 루트의 numbered folder 구조에 저장한다.

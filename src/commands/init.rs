@@ -137,15 +137,15 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
         )
         .detail(
             "writer_setup",
-            "Run `codex login` once, then run `heeforge doctor`. Before the first serious scene, fill a brief, a plot note, a character or world note, and ideally a style or tone guide.",
+            "Run `codex login` once, then run `piuroforge doctor`. Before the first serious scene, fill a brief, a plot note, a character or world note, and ideally a style or tone guide.",
         )
         .detail(
             "setup_done_when",
-            "If `heeforge doctor` says ready, HeeForge setup is finished and you can draft.",
+            "If `piuroforge doctor` says ready, PiuroForge setup is finished and you can draft.",
         )
         .detail(
             "hosted_agent_note",
-            "If you run HeeForge through another assistant or sandboxed tool, that host may still ask for its own approval prompts. Those prompts do not come from HeeForge itself.",
+            "If you run PiuroForge through another assistant or sandboxed tool, that host may still ask for its own approval prompts. Those prompts do not come from PiuroForge itself.",
         )
         .detail(
             "workspace_config",
@@ -160,7 +160,7 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
     Ok(super::finalize_workspace_change(
         engine,
         output,
-        "heeforge: initialize workspace",
+        "piuroforge: initialize workspace",
     ))
 }
 

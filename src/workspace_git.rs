@@ -73,10 +73,10 @@ impl WorkspaceGit {
         let mut command = Command::new("git");
         command.current_dir(&self.workspace_dir);
         command.args(args);
-        command.env("GIT_AUTHOR_NAME", "heeforge");
-        command.env("GIT_AUTHOR_EMAIL", "heeforge@local");
-        command.env("GIT_COMMITTER_NAME", "heeforge");
-        command.env("GIT_COMMITTER_EMAIL", "heeforge@local");
+        command.env("GIT_AUTHOR_NAME", "piuroforge");
+        command.env("GIT_AUTHOR_EMAIL", "piuroforge@local");
+        command.env("GIT_COMMITTER_NAME", "piuroforge");
+        command.env("GIT_COMMITTER_EMAIL", "piuroforge@local");
 
         let output = command
             .output()

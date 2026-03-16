@@ -149,19 +149,19 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
             {
                 "name": "codex_cli",
                 "default": true,
-                "description": "HeeForge does not perform OAuth directly. Install Codex CLI and run `codex login` first."
+                "description": "PiuroForge does not perform OAuth directly. Install Codex CLI and run `codex login` first."
             }
         ],
-        "required_installs": ["heeforge", "codex CLI"],
+        "required_installs": ["piuroforge", "codex CLI"],
         "recommended_setup_sequence": [
-            "install heeforge",
+            "install piuroforge",
             "install Codex CLI",
             "codex login",
-            "heeforge init <workspace>",
-            "heeforge --workspace <workspace> doctor",
+            "piuroforge init <workspace>",
+            "piuroforge --workspace <workspace> doctor",
             "follow next_steps until doctor is ready"
         ],
-        "recommended_invocation": "heeforge --format json --agent <command>",
+        "recommended_invocation": "piuroforge --format json --agent <command>",
         "schema_version": OUTPUT_SCHEMA_VERSION,
         "success_fields": ["schema_version", "status", "agent_mode", "command", "workspace", "summary", "details", "artifacts", "next_steps", "warnings"],
         "error_fields": ["schema_version", "status", "agent_mode", "command", "workspace", "error_code", "reason", "remediation", "details"],
@@ -172,21 +172,21 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
             "Commands that mutate the workspace may auto-commit if workspace_auto_commit is enabled.",
             "Commands that require Codex will fail with codex_unavailable unless Codex is installed, logged in, and reachable.",
             "Call capabilities first, then doctor, then status before mutating commands.",
-            "Current auth mode is codex_cli only. HeeForge expects `codex login` instead of direct OAuth."
+            "Current auth mode is codex_cli only. PiuroForge expects `codex login` instead of direct OAuth."
         ]
     });
 
     let body = "\
 Recommended agent invocation:
-heeforge --workspace <workspace> --format json --agent status
-heeforge --workspace <workspace> --format json --agent next-scene
+piuroforge --workspace <workspace> --format json --agent status
+piuroforge --workspace <workspace> --format json --agent next-scene
 
 Prefer `capabilities`, then `doctor`, then `status` before mutating commands.";
 
     Ok(CommandOutput::ok(
         "capabilities",
         &config.workspace_dir,
-        "HeeForge agent contract and command capabilities.",
+        "PiuroForge agent contract and command capabilities.",
     )
     .detail("llm_backend", &config.llm_backend)
     .detail("auth_mode", "codex_cli")

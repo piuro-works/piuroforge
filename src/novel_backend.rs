@@ -285,7 +285,7 @@ impl NovelBackend for CliNovelBackend {
 
     fn expand_world(&self, request: WorldExpansionRequest) -> Result<WorldExpansionResponse> {
         let prompt = format!(
-            "You are expanding the world bible for HeeForge, a CLI-first AI novel engine.\n\
+            "You are expanding the world bible for PiuroForge, a CLI-first AI novel engine.\n\
 Return plain markdown only with one new section that deepens setting, factions, or rules.\n\n\
 Story foundation:\n{foundation}\n\n\
 Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",

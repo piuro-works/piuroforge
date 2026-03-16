@@ -19,6 +19,6 @@ pub fn run(engine: &NovelEngine, scene_id: &str) -> Result<CommandOutput> {
     Ok(super::finalize_workspace_change(
         engine,
         output,
-        &format!("heeforge: approve scene {scene_id}"),
+        &format!("piuroforge: approve scene {scene_id}"),
     ))
 }

@@ -4,7 +4,7 @@
 
 ## Current Status
 
-- `heeforge` Rust 크레이트가 생성되어 있다.
+- `piuroforge` Rust 크레이트가 생성되어 있다.
 - CLI command 집합이 `src/main.rs`와 `src/commands/`에 구현되어 있다.
 - `doctor` 명령이 workspace 상태, 필수 novel 설정, Codex 연결, fallback 설정을 진단한다.
 - 전역 설정 `llm_backend`와 `doctor`/`capabilities` 출력이 현재 선택 backend와 지원 backend 목록을 노출한다.
@@ -15,14 +15,14 @@
 - project-level 문체 제어를 위해 `03_StoryBible/Voice/` 문서를 foundation에 포함하고, named-author imitation 대신 style/tone/genre/voice guide를 읽도록 방향을 잡았다.
 - 워크스페이스 기반 저장 모델이 적용되어 사람용 소설 데이터는 워크스페이스 루트의 numbered folder에, 엔진 런타임 데이터는 `.novel/`에 분리 저장된다.
 - `1 workspace = 1 novel` 정책을 문서와 초기화 로직에 반영했다.
-- `heeforge init`은 소설 워크스페이스용 `.gitignore`를 생성해 엔진 Git과 소설 Git 분리를 돕는다.
-- `heeforge init`은 `00_Inbox`, `02_Draft`, `03_StoryBible`, `06_Review`, `07_Archive`, `98_Templates`를 포함한 사람용 작업 스캐폴드를 생성한다.
-- `heeforge init`은 루트/섹션 `README.md`와 `98_Templates` starter template 파일도 생성한다.
+- `piuroforge init`은 소설 워크스페이스용 `.gitignore`를 생성해 엔진 Git과 소설 Git 분리를 돕는다.
+- `piuroforge init`은 `00_Inbox`, `02_Draft`, `03_StoryBible`, `06_Review`, `07_Archive`, `98_Templates`를 포함한 사람용 작업 스캐폴드를 생성한다.
+- `piuroforge init`은 루트/섹션 `README.md`와 `98_Templates` starter template 파일도 생성한다.
 - 전역 `config.toml` 생성 내용이 작가용 first-run 설명과 codex/dummy fallback 안내를 포함하도록 보강됐다.
 - scene markdown는 stable `scene_id`를 앞에 유지한 slugged filename으로 저장되며, slug는 scene `short_title` 기준으로 생성된다.
 - chapter markdown는 compiled `short_title`을 포함하고 slugged filename으로 저장된다.
-- 설정 계층이 `~/.config/heeforge/config.toml`, `<workspace>/novel.toml`, `<workspace>/.novel/workspace.json`으로 분리됐다.
-- `heeforge init`은 필수 메타를 인터랙티브하게 수집할 수 있다.
+- 설정 계층이 `~/.config/piuroforge/config.toml`, `<workspace>/novel.toml`, `<workspace>/.novel/workspace.json`으로 분리됐다.
+- `piuroforge init`은 필수 메타를 인터랙티브하게 수집할 수 있다.
 - CLI 전역 옵션 `--format text|json`이 추가됐다.
 - command 출력은 사람용 text와 에이전트용 JSON 계약으로 통일됐다.
 - 모든 JSON 출력은 이제 `schema_version = 1`과 `agent_mode`를 포함한다.
@@ -31,7 +31,7 @@
 - README 상단에 `필수 준비물`, `처음 5분`, `OpenClaw 같은 에이전트` 섹션을 추가해 `init -> doctor -> 조치 -> next-scene` 흐름이 바로 보이게 정리했다.
 - `--help`가 quickstart, 자동화 예시, subcommand 예시를 포함하도록 보강됐다.
 - 저장소 루트 `install.sh`가 GitHub Release 자산 설치를 지원한다.
-- `scripts/package-release.sh`가 target별 `heeforge-<target>.tar.gz`와 `.sha256`를 생성한다.
+- `scripts/package-release.sh`가 target별 `piuroforge-<target>.tar.gz`와 `.sha256`를 생성한다.
 - `.github/workflows/release.yml`가 `v*` tag push 시 release 자산 발행을 담당한다.
 - `v1.0.0` release가 GitHub Releases에 실제 발행됐고, 4개 target 자산과 `.sha256` 파일이 게시됐다.
 - `next-scene`은 `premise`, `protagonist_name` 등 필수 `novel.toml` 값이 비어 있으면 실패한다.
@@ -69,10 +69,10 @@
 ## Verified
 
 - `cargo test`가 통과했다.
-- 더미 codex 경로로 `heeforge init <workspace>`와 `heeforge --workspace <workspace> next-scene` CLI smoke run이 통과했다.
-- 실제 `codex` CLI가 PATH에 있는 로컬 환경에서 `heeforge --workspace <workspace> next-scene` smoke run이 통과했다.
+- 더미 codex 경로로 `piuroforge init <workspace>`와 `piuroforge --workspace <workspace> next-scene` CLI smoke run이 통과했다.
+- 실제 `codex` CLI가 PATH에 있는 로컬 환경에서 `piuroforge --workspace <workspace> next-scene` smoke run이 통과했다.
 - smoke test가 전역 설정 파일과 `novel.toml` 생성, 설정 계층 로딩을 검증한다.
-- `HEEFORGE_CONFIG_DIR=<temp> heeforge init <workspace>`로 전역 `config.toml`, 워크스페이스 `novel.toml`, 내부 `workspace.json` 생성이 확인됐다.
+- `PIUROFORGE_CONFIG_DIR=<temp> piuroforge init <workspace>`로 전역 `config.toml`, 워크스페이스 `novel.toml`, 내부 `workspace.json` 생성이 확인됐다.
 - smoke test가 사람용 `02_Draft`, `03_StoryBible`, `06_Review` 스캐폴드와 워크스페이스 `README.md` 생성을 검증한다.
 - smoke test가 섹션 `README.md`와 template 파일 생성도 검증한다.
 - `cargo test`에서 생성 로그, review 저장, rewrite snapshot, chapter 순서 검증, codex retry가 확인됐다.
@@ -85,7 +85,7 @@
 - smoke test와 CLI test가 `chapter_001-securing-the-lead.md` 형식의 slugged chapter filename과 `Short Title` 섹션 생성을 검증한다.
 - smoke test가 필수 메타 누락 시 scene 생성 차단도 검증한다.
 - smoke test가 `chapter_scene_target` 기본값과 새 template 필드 생성을 검증한다.
-- 인터랙티브 `heeforge init`로 `premise`, `protagonist_name` 입력 후 `novel.toml` 반영이 확인됐다.
+- 인터랙티브 `piuroforge init`로 `premise`, `protagonist_name` 입력 후 `novel.toml` 반영이 확인됐다.
 - 바이너리 테스트에서 `--help`, `status --format json`, `next-scene --format json` 에러 payload가 검증됐다.
 - 바이너리 테스트에서 워크스페이스 하위 디렉터리의 `status`, `next-scene` 실행 시 nearest workspace 자동 탐색이 검증됐다.
 - 바이너리 테스트에서 `rewrite scene_001_001 --instruction ...`가 rewrite snapshot과 scene 갱신을 남기는지 검증됐다.
@@ -93,7 +93,7 @@
 - 바이너리 테스트에서 `init`, `review`, `show`, `memory`, `expand-world` JSON 출력과 관련 산출물 반영이 검증됐다.
 - 바이너리 테스트에서 `review`의 `no_current_scene`, `next-chapter`의 `empty_chapter`/`invalid_scene_sequence`, `show`의 missing scene generic error payload가 검증됐다.
 - 바이너리 테스트와 smoke test가 chapter scene target 초과 생성 차단과 incomplete chapter compile 차단을 검증한다.
-- 로컬 release asset을 만든 뒤 `HEEFORGE_DOWNLOAD_URL=file://... ./install.sh` 설치 smoke check가 통과했다.
+- 로컬 release asset을 만든 뒤 `PIUROFORGE_DOWNLOAD_URL=file://... ./install.sh` 설치 smoke check가 통과했다.
 - `v1.0.0` tag push 후 GitHub Actions release workflow가 성공적으로 release 자산을 게시했다.
 - hang 재현 테스트에서 `codex exec` timeout과 no-retry 동작이 검증됐다.
 - 요구된 문서 파일인 `README.md`, `.env.example`, `AGENTS.md`, `SPEC.md`, `STATE.md`가 존재한다.

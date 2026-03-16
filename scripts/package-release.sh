@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-BINARY_NAME="heeforge"
+BINARY_NAME="piuroforge"
 
 usage() {
   cat <<'EOF'

@@ -243,10 +243,10 @@ pub struct WorkspaceManifest {
 impl Default for WorkspaceManifest {
     fn default() -> Self {
         Self {
-            kind: "heeforge-workspace".to_string(),
+            kind: "piuroforge-workspace".to_string(),
             version: 1,
-            name: "heeforge-workspace".to_string(),
-            created_by: "heeforge".to_string(),
+            name: "piuroforge-workspace".to_string(),
+            created_by: "piuroforge".to_string(),
             engine_version: env!("CARGO_PKG_VERSION").to_string(),
             workspace_config: "novel.toml".to_string(),
         }

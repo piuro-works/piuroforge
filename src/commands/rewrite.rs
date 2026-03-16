@@ -33,6 +33,6 @@ pub fn run(engine: &NovelEngine, scene_id: &str, instruction: &str) -> Result<Co
     Ok(super::finalize_workspace_change(
         engine,
         output,
-        &format!("heeforge: rewrite scene {}", scene.id),
+        &format!("piuroforge: rewrite scene {}", scene.id),
     ))
 }

@@ -9,7 +9,7 @@ pub const SUPPORTED_LLM_BACKENDS: &[&str] = &[DEFAULT_LLM_BACKEND];
 pub const WORKSPACE_DIR_NAME: &str = ".novel";
 pub const WORKSPACE_MANIFEST_FILE: &str = "workspace.json";
 pub const WORKSPACE_CONFIG_FILE: &str = "novel.toml";
-pub const GLOBAL_CONFIG_DIR_NAME: &str = "heeforge";
+pub const GLOBAL_CONFIG_DIR_NAME: &str = "piuroforge";
 pub const GLOBAL_CONFIG_FILE: &str = "config.toml";
 
 #[derive(Debug, Clone)]
@@ -68,7 +68,7 @@ impl Config {
         if novel_settings.title.trim().is_empty() {
             novel_settings.title = default_title_from_path(&workspace_dir);
         }
-        let llm_backend = env::var("HEEFORGE_LLM_BACKEND")
+        let llm_backend = env::var("PIUROFORGE_LLM_BACKEND")
             .or_else(|_| env::var("NOVEL_ENGINE_LLM_BACKEND"))
             .unwrap_or_else(|_| global_settings.llm_backend.clone());
         let llm_backend = normalize_llm_backend(&llm_backend)?;
@@ -88,20 +88,20 @@ impl Config {
             review_revisions_dir,
             workspace_readme_path,
             logs_dir,
-            allow_dummy_fallback: env_flag("HEEFORGE_ALLOW_DUMMY")
+            allow_dummy_fallback: env_flag("PIUROFORGE_ALLOW_DUMMY")
                 .or_else(|| env_flag("NOVEL_ENGINE_ALLOW_DUMMY"))
                 .unwrap_or(global_settings.allow_dummy_fallback),
-            log_prompts: env_flag("HEEFORGE_LOG_PROMPTS")
+            log_prompts: env_flag("PIUROFORGE_LOG_PROMPTS")
                 .or_else(|| env_flag("NOVEL_ENGINE_LOG_PROMPTS"))
                 .unwrap_or(global_settings.log_prompts),
-            workspace_auto_commit: env_flag("HEEFORGE_WORKSPACE_AUTO_COMMIT")
+            workspace_auto_commit: env_flag("PIUROFORGE_WORKSPACE_AUTO_COMMIT")
                 .or_else(|| env_flag("NOVEL_ENGINE_WORKSPACE_AUTO_COMMIT"))
                 .unwrap_or(global_settings.workspace_auto_commit),
             llm_backend,
-            codex_command: env::var("HEEFORGE_CODEX_CMD")
+            codex_command: env::var("PIUROFORGE_CODEX_CMD")
                 .or_else(|_| env::var("NOVEL_ENGINE_CODEX_CMD"))
                 .unwrap_or_else(|_| global_settings.codex_command.clone()),
-            codex_timeout_secs: env_u64("HEEFORGE_CODEX_TIMEOUT_SECS")
+            codex_timeout_secs: env_u64("PIUROFORGE_CODEX_TIMEOUT_SECS")
                 .or_else(|| env_u64("NOVEL_ENGINE_CODEX_TIMEOUT_SECS"))
                 .unwrap_or(global_settings.codex_timeout_secs),
             global_settings,
@@ -114,7 +114,7 @@ impl Config {
             .file_name()
             .and_then(|value| value.to_str())
             .filter(|value| !value.is_empty())
-            .unwrap_or("heeforge-workspace")
+            .unwrap_or("piuroforge-workspace")
             .to_string()
     }
 
@@ -124,16 +124,16 @@ impl Config {
 
     pub fn render_global_config(&self) -> Result<String> {
         Ok(format!(
-            "# HeeForge global settings\n\
+            "# PiuroForge global settings\n\
 #\n\
 # First run for writers:\n\
 # 1. Open a terminal once and run: codex login\n\
-# 2. Keep llm_backend = \"codex_cli\" unless you intentionally install a custom HeeForge backend build later\n\
+# 2. Keep llm_backend = \"codex_cli\" unless you intentionally install a custom PiuroForge backend build later\n\
 # 3. Leave allow_dummy_fallback = false for real drafting\n\
 # 4. Turn allow_dummy_fallback = true on only if you intentionally want placeholder text for workflow testing\n\
 # 5. Turn workspace_auto_commit = true on if you want Git history created automatically inside each novel workspace\n\
 #\n\
-# If HeeForge shows `codex_unavailable`, the usual causes are:\n\
+# If PiuroForge shows `codex_unavailable`, the usual causes are:\n\
 # - codex login has not been completed yet\n\
 # - this machine cannot reach the Codex service because of internet, DNS, VPN, or proxy issues\n\
 \n\
@@ -162,7 +162,7 @@ default_language = {default_language:?}\n\
 
     pub fn render_workspace_config(&self) -> Result<String> {
         let mut rendered = String::from(
-            "# HeeForge novel workspace settings\n\
+            "# PiuroForge novel workspace settings\n\
 #\n\
 # Writing policy defaults:\n\
 # - chapter_scene_target = 3 means each chapter should usually draft as incident -> escalation -> cliffhanger\n\
@@ -311,7 +311,7 @@ where
 }
 
 fn resolve_global_config_dir() -> Result<PathBuf> {
-    if let Ok(path) = env::var("HEEFORGE_CONFIG_DIR") {
+    if let Ok(path) = env::var("PIUROFORGE_CONFIG_DIR") {
         return Ok(PathBuf::from(path));
     }
 
@@ -348,7 +348,7 @@ fn default_title_from_path(path: &Path) -> String {
         .file_name()
         .and_then(|value| value.to_str())
         .filter(|value| !value.is_empty())
-        .unwrap_or("heeforge-workspace");
+        .unwrap_or("piuroforge-workspace");
 
     raw.split(['-', '_', ' '])
         .filter(|segment| !segment.is_empty())

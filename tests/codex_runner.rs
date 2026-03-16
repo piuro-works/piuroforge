@@ -1,5 +1,5 @@
 use anyhow::Result;
-use heeforge::codex_runner::CodexRunner;
+use piuroforge::codex_runner::CodexRunner;
 use std::os::unix::fs::PermissionsExt;
 use std::time::{Duration, Instant};
 use tempfile::tempdir;

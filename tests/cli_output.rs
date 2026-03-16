@@ -1,7 +1,7 @@
 use anyhow::Result;
-use heeforge::models::Scene;
-use heeforge::utils::markdown::render_scene;
-use heeforge::{Config, NovelEngine};
+use piuroforge::models::Scene;
+use piuroforge::utils::markdown::render_scene;
+use piuroforge::{Config, NovelEngine};
 use serde_json::Value;
 use std::path::Path;
 use std::process::Command;
@@ -18,9 +18,9 @@ fn help_mentions_json_output_and_examples() -> Result<()> {
     assert!(stdout.contains("--agent"));
     assert!(stdout.contains("Use `json` for Codex CLI"));
     assert!(stdout.contains("Quickstart:"));
-    assert!(stdout.contains("heeforge doctor"));
-    assert!(stdout.contains("heeforge --format json --agent capabilities"));
-    assert!(stdout.contains("heeforge --workspace ~/novels/my-book --format json status"));
+    assert!(stdout.contains("piuroforge doctor"));
+    assert!(stdout.contains("piuroforge --format json --agent capabilities"));
+    assert!(stdout.contains("piuroforge --workspace ~/novels/my-book --format json status"));
 
     Ok(())
 }
@@ -55,7 +55,7 @@ fn capabilities_json_reports_agent_contract() -> Result<()> {
     assert_eq!(detail_value(&payload, "recommended_flag"), Some("--agent"));
     assert_eq!(
         payload["data"]["recommended_invocation"],
-        "heeforge --format json --agent <command>"
+        "piuroforge --format json --agent <command>"
     );
     assert_eq!(payload["data"]["auth_mode"], "codex_cli");
     assert_eq!(payload["data"]["selected_backend"], "codex_cli");
@@ -89,7 +89,7 @@ fn status_json_output_is_structured() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("status")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(output.status.success());
@@ -151,9 +151,9 @@ fn doctor_json_reports_setup_issues_without_workspace() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("doctor")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .env(
-            "HEEFORGE_CODEX_CMD",
+            "PIUROFORGE_CODEX_CMD",
             "codex-command-for-tests-that-does-not-exist",
         )
         .output()?;
@@ -177,13 +177,16 @@ fn doctor_json_reports_setup_issues_without_workspace() -> Result<()> {
         detail_value(&payload, "supported_llm_backends"),
         Some("codex_cli")
     );
-    assert!(warning_contains(&payload, "No HeeForge workspace marker"));
+    assert!(warning_contains(&payload, "No PiuroForge workspace marker"));
     assert!(warning_contains(&payload, "Codex CLI was not found"));
     assert!(payload["next_steps"]
         .as_array()
         .unwrap_or(&vec![])
         .iter()
-        .any(|item| item.as_str().unwrap_or_default().contains("heeforge init")));
+        .any(|item| item
+            .as_str()
+            .unwrap_or_default()
+            .contains("piuroforge init")));
     assert!(payload["next_steps"]
         .as_array()
         .unwrap_or(&vec![])
@@ -212,7 +215,7 @@ fn status_json_error_for_unsupported_llm_backend_is_structured() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("status")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(!output.status.success());
@@ -260,7 +263,7 @@ fn init_json_creates_ready_workspace_without_prompting() -> Result<()> {
         .arg("Yunseo")
         .arg("--language")
         .arg("ko")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(output.status.success());
@@ -276,11 +279,11 @@ fn init_json_creates_ready_workspace_without_prompting() -> Result<()> {
     assert_eq!(detail_value(&payload, "title"), Some("Fresh Novel"));
     assert_eq!(
         detail_value(&payload, "writer_setup"),
-        Some("Run `codex login` once, then run `heeforge doctor`. Before the first serious scene, fill a brief, a plot note, a character or world note, and ideally a style or tone guide.")
+        Some("Run `codex login` once, then run `piuroforge doctor`. Before the first serious scene, fill a brief, a plot note, a character or world note, and ideally a style or tone guide.")
     );
     assert_eq!(
         detail_value(&payload, "setup_done_when"),
-        Some("If `heeforge doctor` says ready, HeeForge setup is finished and you can draft.")
+        Some("If `piuroforge doctor` says ready, PiuroForge setup is finished and you can draft.")
     );
     assert!(detail_value(&payload, "hosted_agent_note")
         .unwrap_or_default()
@@ -323,8 +326,8 @@ fn workspace_auto_commit_initializes_repo_and_tracks_mutations() -> Result<()> {
         .arg("Yunseo")
         .arg("--language")
         .arg("ko")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
-        .env("HEEFORGE_WORKSPACE_AUTO_COMMIT", "true")
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_WORKSPACE_AUTO_COMMIT", "true")
         .output()?;
 
     assert!(init_output.status.success());
@@ -339,7 +342,7 @@ fn workspace_auto_commit_initializes_repo_and_tracks_mutations() -> Result<()> {
     assert!(detail_value(&init_payload, "git_commit").is_some());
     assert_eq!(
         git_stdout(&workspace, ["log", "-1", "--pretty=%s"])?,
-        "heeforge: initialize workspace"
+        "piuroforge: initialize workspace"
     );
 
     let next_scene_output = Command::new(novel_bin())
@@ -348,11 +351,11 @@ fn workspace_auto_commit_initializes_repo_and_tracks_mutations() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("next-scene")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
-        .env("HEEFORGE_ALLOW_DUMMY", "true")
-        .env("HEEFORGE_WORKSPACE_AUTO_COMMIT", "true")
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_ALLOW_DUMMY", "true")
+        .env("PIUROFORGE_WORKSPACE_AUTO_COMMIT", "true")
         .env(
-            "HEEFORGE_CODEX_CMD",
+            "PIUROFORGE_CODEX_CMD",
             "codex-command-for-tests-that-does-not-exist",
         )
         .output()?;
@@ -369,7 +372,7 @@ fn workspace_auto_commit_initializes_repo_and_tracks_mutations() -> Result<()> {
     );
     assert_eq!(
         git_stdout(&workspace, ["log", "-1", "--pretty=%s"])?,
-        "heeforge: draft scene scene_001_001"
+        "piuroforge: draft scene scene_001_001"
     );
 
     Ok(())
@@ -398,7 +401,7 @@ fn next_scene_json_error_when_codex_unavailable_by_default() -> Result<()> {
         .arg("Yunseo")
         .arg("--language")
         .arg("ko")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(init_output.status.success());
@@ -409,9 +412,9 @@ fn next_scene_json_error_when_codex_unavailable_by_default() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("next-scene")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .env(
-            "HEEFORGE_CODEX_CMD",
+            "PIUROFORGE_CODEX_CMD",
             "codex-command-for-tests-that-does-not-exist",
         )
         .output()?;
@@ -463,7 +466,7 @@ fn next_scene_json_with_opt_in_dummy_fallback_surfaces_warning() -> Result<()> {
         .arg("Yunseo")
         .arg("--language")
         .arg("ko")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(init_output.status.success());
@@ -474,10 +477,10 @@ fn next_scene_json_with_opt_in_dummy_fallback_surfaces_warning() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("next-scene")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
-        .env("HEEFORGE_ALLOW_DUMMY", "true")
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_ALLOW_DUMMY", "true")
         .env(
-            "HEEFORGE_CODEX_CMD",
+            "PIUROFORGE_CODEX_CMD",
             "codex-command-for-tests-that-does-not-exist",
         )
         .output()?;
@@ -510,7 +513,7 @@ fn status_json_auto_detects_workspace_from_nested_directory() -> Result<()> {
         .arg("json")
         .arg("status")
         .current_dir(&nested_dir)
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(output.status.success());
@@ -542,9 +545,9 @@ fn review_json_output_is_structured() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("review")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .env(
-            "HEEFORGE_CODEX_CMD",
+            "PIUROFORGE_CODEX_CMD",
             "codex-command-for-tests-that-does-not-exist",
         )
         .output()?;
@@ -591,7 +594,7 @@ fn review_json_error_without_current_scene_is_structured() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("review")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(!output.status.success());
@@ -629,7 +632,7 @@ fn next_scene_json_error_contains_remediation() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("next-scene")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(!output.status.success());
@@ -667,7 +670,7 @@ fn show_json_output_is_structured() -> Result<()> {
         .arg("json")
         .arg("show")
         .arg("scene_001_001")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(output.status.success());
@@ -704,7 +707,7 @@ fn show_json_error_for_missing_scene_is_structured() -> Result<()> {
         .arg("json")
         .arg("show")
         .arg("scene_999_999")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(!output.status.success());
@@ -718,7 +721,7 @@ fn show_json_error_for_missing_scene_is_structured() -> Result<()> {
         .as_str()
         .unwrap_or_default()
         .contains("scene_999_999"));
-    let expected_example = format!("heeforge --workspace {} show", workspace.display());
+    let expected_example = format!("piuroforge --workspace {} show", workspace.display());
     assert_eq!(
         payload["example_command"].as_str().unwrap_or_default(),
         expected_example
@@ -742,9 +745,9 @@ fn next_scene_json_auto_detects_workspace_from_nested_directory() -> Result<()> 
         .arg("json")
         .arg("next-scene")
         .current_dir(&nested_dir)
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .env(
-            "HEEFORGE_CODEX_CMD",
+            "PIUROFORGE_CODEX_CMD",
             "codex-command-for-tests-that-does-not-exist",
         )
         .output()?;
@@ -792,7 +795,7 @@ fn memory_json_output_is_structured() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("memory")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(output.status.success());
@@ -838,9 +841,9 @@ fn rewrite_json_output_preserves_history_and_updates_scene() -> Result<()> {
         .arg("scene_001_001")
         .arg("--instruction")
         .arg("Make it darker and sharper")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .env(
-            "HEEFORGE_CODEX_CMD",
+            "PIUROFORGE_CODEX_CMD",
             "codex-command-for-tests-that-does-not-exist",
         )
         .output()?;
@@ -903,9 +906,9 @@ fn expand_world_json_output_updates_story_memory() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("expand-world")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .env(
-            "HEEFORGE_CODEX_CMD",
+            "PIUROFORGE_CODEX_CMD",
             "codex-command-for-tests-that-does-not-exist",
         )
         .output()?;
@@ -949,7 +952,7 @@ fn next_chapter_json_output_includes_short_title_and_slugged_path() -> Result<()
         .arg("--format")
         .arg("json")
         .arg("next-chapter")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(output.status.success());
@@ -993,7 +996,7 @@ fn next_scene_json_error_after_chapter_scene_target_is_reached() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("next-scene")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(!output.status.success());
@@ -1025,7 +1028,7 @@ fn next_chapter_json_error_without_scenes_is_structured() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("next-chapter")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(!output.status.success());
@@ -1063,7 +1066,7 @@ fn next_chapter_json_error_when_chapter_is_incomplete() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("next-chapter")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(!output.status.success());
@@ -1125,7 +1128,7 @@ fn next_chapter_json_error_for_gapped_sequence_is_structured() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("next-chapter")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(!output.status.success());
@@ -1164,7 +1167,7 @@ fn approve_json_output_marks_scene_and_state_as_approved() -> Result<()> {
         .arg("json")
         .arg("approve")
         .arg("scene_001_001")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(output.status.success());
@@ -1188,7 +1191,7 @@ fn approve_json_output_marks_scene_and_state_as_approved() -> Result<()> {
         .arg("--format")
         .arg("json")
         .arg("status")
-        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
     assert!(status_output.status.success());
@@ -1227,7 +1230,7 @@ fn ready_engine(
 }
 
 fn novel_bin() -> &'static str {
-    env!("CARGO_BIN_EXE_heeforge")
+    env!("CARGO_BIN_EXE_piuroforge")
 }
 
 fn assert_same_path(actual: &str, expected: &Path) -> Result<()> {

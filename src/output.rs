@@ -278,9 +278,9 @@ impl ErrorOutput {
                 error_code: "unsupported_llm_backend".to_string(),
                 reason,
                 remediation: vec![
-                    "Open ~/.config/heeforge/config.toml and set llm_backend = \"codex_cli\"."
+                    "Open ~/.config/piuroforge/config.toml and set llm_backend = \"codex_cli\"."
                         .to_string(),
-                    "If you intended to use a custom backend, install a HeeForge build that includes that backend first."
+                    "If you intended to use a custom backend, install a PiuroForge build that includes that backend first."
                         .to_string(),
                     example_for("doctor", workspace),
                 ],
@@ -303,9 +303,9 @@ impl ErrorOutput {
                 error_code: "invalid_llm_payload".to_string(),
                 reason,
                 remediation: vec![
-                    "Retry once. If the same error repeats, the active LLM/backend is not following the HeeForge JSON contract."
+                    "Retry once. If the same error repeats, the active LLM/backend is not following the PiuroForge JSON contract."
                         .to_string(),
-                    "If you are developing a custom backend, validate planner output fields and critic review JSON before returning it to HeeForge."
+                    "If you are developing a custom backend, validate planner output fields and critic review JSON before returning it to PiuroForge."
                         .to_string(),
                     example_for("doctor", workspace),
                     example_for(command, workspace),
@@ -329,11 +329,11 @@ impl ErrorOutput {
                 );
             }
             remediation.push(
-                "If you only want to test the writing workflow without live Codex, open ~/.config/heeforge/config.toml and set allow_dummy_fallback = true. HeeForge will then mark placeholder output with warnings."
+                "If you only want to test the writing workflow without live Codex, open ~/.config/piuroforge/config.toml and set allow_dummy_fallback = true. PiuroForge will then mark placeholder output with warnings."
                     .to_string(),
             );
             remediation.push(
-                "If you are calling HeeForge through another assistant or sandboxed tool, any extra approval prompt usually comes from that host environment, not from HeeForge setup itself."
+                "If you are calling PiuroForge through another assistant or sandboxed tool, any extra approval prompt usually comes from that host environment, not from PiuroForge setup itself."
                     .to_string(),
             );
             remediation.push(example_for("doctor", workspace));
@@ -365,9 +365,9 @@ impl ErrorOutput {
                     "Generate a scene before running review.".to_string(),
                     workspace
                         .map(|path| {
-                            format!("Run: heeforge --workspace {} next-scene", path.display())
+                            format!("Run: piuroforge --workspace {} next-scene", path.display())
                         })
-                        .unwrap_or_else(|| "Run: heeforge next-scene".to_string()),
+                        .unwrap_or_else(|| "Run: piuroforge next-scene".to_string()),
                 ],
                 example_command: Some(example_for("next-scene", workspace)),
                 details: vec![],
@@ -565,8 +565,8 @@ pub fn emit_error(output: &ErrorOutput, format: OutputFormat) -> Result<()> {
 
 fn example_for(command: &str, workspace: Option<&Path>) -> String {
     match workspace {
-        Some(path) => format!("heeforge --workspace {} {}", path.display(), command),
-        None => format!("heeforge {}", command),
+        Some(path) => format!("piuroforge --workspace {} {}", path.display(), command),
+        None => format!("piuroforge {}", command),
     }
 }
 

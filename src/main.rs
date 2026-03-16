@@ -3,103 +3,103 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::process;
 
-use heeforge::config::{WORKSPACE_DIR_NAME, WORKSPACE_MANIFEST_FILE};
-use heeforge::output::{emit_command, emit_error, CommandOutput, ErrorOutput, OutputFormat};
-use heeforge::{commands, Config, NovelEngine};
+use piuroforge::config::{WORKSPACE_DIR_NAME, WORKSPACE_MANIFEST_FILE};
+use piuroforge::output::{emit_command, emit_error, CommandOutput, ErrorOutput, OutputFormat};
+use piuroforge::{commands, Config, NovelEngine};
 
 const CLI_AFTER_HELP: &str = "\
 Quickstart:
-  heeforge init ~/novels/my-book
+  piuroforge init ~/novels/my-book
   cd ~/novels/my-book
-  heeforge doctor
-  heeforge next-scene
-  heeforge review
+  piuroforge doctor
+  piuroforge next-scene
+  piuroforge review
 
 Automation:
-  heeforge --format json --agent capabilities
-  heeforge --workspace ~/novels/my-book --format json status
-  heeforge --workspace ~/novels/my-book --format json next-scene
+  piuroforge --format json --agent capabilities
+  piuroforge --workspace ~/novels/my-book --format json status
+  piuroforge --workspace ~/novels/my-book --format json next-scene
 ";
 
 const INIT_AFTER_HELP: &str = "\
 Examples:
-  heeforge init ~/novels/my-book
-  heeforge init ~/novels/my-book --title \"기억 편집자\" --genre Mystery --tone \"Tense\" --premise \"...\" --protagonist \"윤서\" --language ko
-  heeforge --format json init ~/novels/my-book --no-input
+  piuroforge init ~/novels/my-book
+  piuroforge init ~/novels/my-book --title \"기억 편집자\" --genre Mystery --tone \"Tense\" --premise \"...\" --protagonist \"윤서\" --language ko
+  piuroforge --format json init ~/novels/my-book --no-input
 ";
 
 const STATUS_AFTER_HELP: &str = "\
 Examples:
-  heeforge status
-  heeforge --workspace ~/novels/my-book --format json status
+  piuroforge status
+  piuroforge --workspace ~/novels/my-book --format json status
 ";
 
 const DOCTOR_AFTER_HELP: &str = "\
 Examples:
-  heeforge doctor
-  heeforge --workspace ~/novels/my-book --format json doctor
+  piuroforge doctor
+  piuroforge --workspace ~/novels/my-book --format json doctor
 ";
 
 const CAPABILITIES_AFTER_HELP: &str = "\
 Examples:
-  heeforge capabilities
-  heeforge --format json --agent capabilities
+  piuroforge capabilities
+  piuroforge --format json --agent capabilities
 ";
 
 const NEXT_SCENE_AFTER_HELP: &str = "\
 Examples:
-  heeforge next-scene
-  heeforge --workspace ~/novels/my-book --format json next-scene
+  piuroforge next-scene
+  piuroforge --workspace ~/novels/my-book --format json next-scene
 ";
 
 const REVIEW_AFTER_HELP: &str = "\
 Examples:
-  heeforge review
-  heeforge --workspace ~/novels/my-book --format json review
+  piuroforge review
+  piuroforge --workspace ~/novels/my-book --format json review
 ";
 
 const REWRITE_AFTER_HELP: &str = "\
 Examples:
-  heeforge rewrite scene_001_001 --instruction \"대사를 더 날카롭게\"
-  heeforge --workspace ~/novels/my-book --format json rewrite scene_001_001 --instruction \"Compress repeated exposition\"
+  piuroforge rewrite scene_001_001 --instruction \"대사를 더 날카롭게\"
+  piuroforge --workspace ~/novels/my-book --format json rewrite scene_001_001 --instruction \"Compress repeated exposition\"
 ";
 
 const APPROVE_AFTER_HELP: &str = "\
 Examples:
-  heeforge approve scene_001_001
-  heeforge --workspace ~/novels/my-book --format json approve scene_001_001
+  piuroforge approve scene_001_001
+  piuroforge --workspace ~/novels/my-book --format json approve scene_001_001
 ";
 
 const NEXT_CHAPTER_AFTER_HELP: &str = "\
 Examples:
-  heeforge next-chapter
-  heeforge --workspace ~/novels/my-book --format json next-chapter
+  piuroforge next-chapter
+  piuroforge --workspace ~/novels/my-book --format json next-chapter
 ";
 
 const EXPAND_WORLD_AFTER_HELP: &str = "\
 Examples:
-  heeforge expand-world
-  heeforge --workspace ~/novels/my-book --format json expand-world
+  piuroforge expand-world
+  piuroforge --workspace ~/novels/my-book --format json expand-world
 ";
 
 const MEMORY_AFTER_HELP: &str = "\
 Examples:
-  heeforge memory
-  heeforge --workspace ~/novels/my-book --format json memory
+  piuroforge memory
+  piuroforge --workspace ~/novels/my-book --format json memory
 ";
 
 const SHOW_AFTER_HELP: &str = "\
 Examples:
-  heeforge show scene_001_001
-  heeforge --workspace ~/novels/my-book --format json show scene_001_001
+  piuroforge show scene_001_001
+  piuroforge --workspace ~/novels/my-book --format json show scene_001_001
 ";
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "heeforge",
+    name = "piuroforge",
     version,
-    about = "HeeForge CLI novel engine for one workspace = one novel.",
-    long_about = "HeeForge creates one novel workspace, then generates, reviews, rewrites, approves, and compiles scenes from the terminal. Use `--format json` when another LLM agent needs stable, machine-readable output.",
+    about = "PiuroForge CLI novel engine for one workspace = one novel.",
+    long_about = "PiuroForge creates one novel workspace, then generates, reviews, rewrites, approves, and compiles scenes from the terminal. Use `--format json` when another LLM agent needs stable, machine-readable output.",
     after_long_help = CLI_AFTER_HELP
 )]
 struct Cli {

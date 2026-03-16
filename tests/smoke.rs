@@ -1,11 +1,11 @@
 use anyhow::Result;
-use heeforge::models::Scene;
-use heeforge::novel_backend::{
+use piuroforge::models::Scene;
+use piuroforge::novel_backend::{
     NovelBackend, ReviewRequest, ReviewResponse, RewriteRequest, RewriteResponse,
     SceneGenerationRequest, SceneGenerationResponse, WorldExpansionRequest, WorldExpansionResponse,
 };
-use heeforge::utils::markdown::render_scene;
-use heeforge::{Config, NovelEngine};
+use piuroforge::utils::markdown::render_scene;
+use piuroforge::{Config, NovelEngine};
 use serde_json::Value;
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -22,7 +22,7 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
 
     assert!(temp_dir.path().join("config-home/config.toml").exists());
     let global_config = std::fs::read_to_string(temp_dir.path().join("config-home/config.toml"))?;
-    assert!(global_config.contains("# HeeForge global settings"));
+    assert!(global_config.contains("# PiuroForge global settings"));
     assert!(global_config.contains("codex login"));
     assert!(global_config.contains("llm_backend = \"codex_cli\""));
     assert!(global_config.contains("codex_command = \"codex\""));
@@ -46,7 +46,7 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
     let workspace_readme = std::fs::read_to_string(workspace.join("README.md"))?;
     assert!(workspace_readme.contains("This workspace separates human-facing manuscript files"));
     assert!(workspace_readme.contains("First Run Checklist"));
-    assert!(workspace_readme.contains("heeforge doctor"));
+    assert!(workspace_readme.contains("piuroforge doctor"));
     assert!(workspace_readme.contains("project brief"));
     assert!(workspace_readme.contains("style/tone guide"));
     assert!(workspace_readme.contains("If Doctor says ready"));
@@ -323,7 +323,7 @@ fn novel_engine_can_use_injected_backend() -> Result<()> {
 fn config_layers_remain_separated() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("book-one");
-    let global_dir = temp_dir.path().join("global-heeforge");
+    let global_dir = temp_dir.path().join("global-piuroforge");
     std::fs::create_dir_all(&global_dir)?;
     std::fs::write(
         global_dir.join("config.toml"),

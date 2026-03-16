@@ -23,6 +23,6 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
     Ok(super::finalize_workspace_change(
         engine,
         output,
-        "heeforge: expand world memory",
+        "piuroforge: expand world memory",
     ))
 }

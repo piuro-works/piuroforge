@@ -1,10 +1,10 @@
 [package]
-name = "heeforge"
+name = "piuroforge"
 version = "1.0.1"
 edition = "2021"
 
 [[bin]]
-name = "heeforge"
+name = "piuroforge"
 path = "src/main.rs"
 
 [dependencies]

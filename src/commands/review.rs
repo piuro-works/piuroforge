@@ -42,7 +42,7 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
         return Ok(super::finalize_workspace_change(
             engine,
             output,
-            &format!("heeforge: review scene {scene_id}"),
+            &format!("piuroforge: review scene {scene_id}"),
         ));
     }
 
@@ -77,6 +77,6 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
     Ok(super::finalize_workspace_change(
         engine,
         output,
-        &format!("heeforge: review scene {scene_id}"),
+        &format!("piuroforge: review scene {scene_id}"),
     ))
 }

@@ -40,6 +40,6 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
     Ok(super::finalize_workspace_change(
         engine,
         output,
-        &format!("heeforge: draft scene {}", scene.id),
+        &format!("piuroforge: draft scene {}", scene.id),
     ))
 }

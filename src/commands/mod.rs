@@ -17,7 +17,7 @@ use crate::workspace_git::WorkspaceGitOutcome;
 
 fn workspace_command(engine: &NovelEngine, args: &str) -> String {
     format!(
-        "heeforge --workspace {} {}",
+        "piuroforge --workspace {} {}",
         engine.workspace_dir().display(),
         args
     )

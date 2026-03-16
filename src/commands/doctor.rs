@@ -30,15 +30,21 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
 
     if !workspace_manifest_exists {
         warnings.push(
-            "No HeeForge workspace marker was found here yet. Run `heeforge init` before drafting."
+            "No PiuroForge workspace marker was found here yet. Run `piuroforge init` before drafting."
                 .to_string(),
         );
-        next_steps.push(format!("heeforge init {}", config.workspace_dir.display()));
+        next_steps.push(format!(
+            "piuroforge init {}",
+            config.workspace_dir.display()
+        ));
     }
 
     if !workspace_config_exists {
         warnings.push("`novel.toml` is missing in this workspace.".to_string());
-        next_steps.push(format!("heeforge init {}", config.workspace_dir.display()));
+        next_steps.push(format!(
+            "piuroforge init {}",
+            config.workspace_dir.display()
+        ));
     }
 
     if !missing_fields.is_empty() {
@@ -51,7 +57,7 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
 
     if !global_config_exists {
         warnings.push(format!(
-            "Global settings file does not exist yet at {}. It will be created automatically by `heeforge init`.",
+            "Global settings file does not exist yet at {}. It will be created automatically by `piuroforge init`.",
             config.global_config_path.display()
         ));
     }
@@ -90,7 +96,7 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
                 }
                 warnings.push(format!("Codex check detail: {}.", compact_message(&error)));
                 next_steps.push("Open a terminal and run: codex login".to_string());
-                next_steps.push("heeforge doctor".to_string());
+                next_steps.push("piuroforge doctor".to_string());
                 CodexConnection::Unavailable
             }
         },
@@ -98,7 +104,7 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
 
     if config.allow_dummy_fallback {
         warnings.push(
-            "Dummy fallback is ON. HeeForge can produce placeholder text instead of live Codex output."
+            "Dummy fallback is ON. PiuroForge can produce placeholder text instead of live Codex output."
                 .to_string(),
         );
     }
@@ -111,7 +117,7 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
 
     if ready_to_draft {
         next_steps.push(format!(
-            "heeforge --workspace {} next-scene",
+            "piuroforge --workspace {} next-scene",
             config.workspace_dir.display()
         ));
     } else if workspace_manifest_exists && workspace_config_exists && missing_fields.is_empty() {
@@ -125,7 +131,7 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
     dedup(&mut next_steps);
 
     let summary = if ready_to_draft {
-        "Doctor check passed. HeeForge is ready for real drafting."
+        "Doctor check passed. PiuroForge is ready for real drafting."
     } else {
         "Doctor found setup issues to fix before real drafting."
     };
@@ -295,7 +301,7 @@ fn render_doctor_body(
     };
 
     format!(
-        "HeeForge Doctor\n\n- LLM backend: {llm_backend}\n- Workspace: {workspace_state}\n- Novel config: {config_state}\n- Codex: {codex_state}\n- Fallback: {fallback_state}\n- Workspace Git auto-commit: {git_state}\n\nIf Doctor says ready, HeeForge setup is finished and you can move on to `heeforge next-scene`.\n\nIf you run HeeForge through another assistant, IDE agent, or sandboxed tool, that host may still ask for its own approval prompts. Those prompts are outside HeeForge."
+        "PiuroForge Doctor\n\n- LLM backend: {llm_backend}\n- Workspace: {workspace_state}\n- Novel config: {config_state}\n- Codex: {codex_state}\n- Fallback: {fallback_state}\n- Workspace Git auto-commit: {git_state}\n\nIf Doctor says ready, PiuroForge setup is finished and you can move on to `piuroforge next-scene`.\n\nIf you run PiuroForge through another assistant, IDE agent, or sandboxed tool, that host may still ask for its own approval prompts. Those prompts are outside PiuroForge."
     )
 }
 

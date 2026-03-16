@@ -402,7 +402,7 @@ fn timeout_for_label(base: Duration, label: &str) -> Duration {
 
 fn codex_output_file_path(label: &str, attempt: usize, started_at: SystemTime) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "heeforge-codex-{}-attempt{:02}-{}.txt",
+        "piuroforge-codex-{}-attempt{:02}-{}.txt",
         sanitize_label(label),
         attempt,
         unix_timestamp_millis(started_at)

@@ -1,4 +1,4 @@
-You are the Editor for HeeForge, a CLI-first AI novel engine.
+You are the Editor for PiuroForge, a CLI-first AI novel engine.
 Revise the scene below according to the instruction.
 Return plain prose only, no headings, no JSON.
 Novel title: {{title}}
