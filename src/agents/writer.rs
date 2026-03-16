@@ -8,12 +8,11 @@ use crate::prompts::{render_template, WRITER_TEMPLATE};
 #[derive(Clone)]
 pub struct WriterAgent {
     runner: Arc<dyn PromptRunner>,
-    use_codex: bool,
 }
 
 impl WriterAgent {
-    pub fn new(runner: Arc<dyn PromptRunner>, use_codex: bool) -> Self {
-        Self { runner, use_codex }
+    pub fn new(runner: Arc<dyn PromptRunner>) -> Self {
+        Self { runner }
     }
 
     fn build_prompt(&self, context: &AgentContext) -> Result<String> {
@@ -69,23 +68,16 @@ By the end of the scene, {outcome} The victory was real enough to matter, but in
 
 impl Agent for WriterAgent {
     fn run(&self, context: &AgentContext) -> Result<AgentRun> {
-        if self.use_codex {
-            let prompt = self.build_prompt(context)?;
-            match self.runner.run_prompt_named("writer", &prompt) {
-                Ok(response) => return Ok(AgentRun::direct(response)),
-                Err(error) if !context.allow_dummy_fallback => return Err(error),
-                Err(error) => {
-                    return Ok(AgentRun::fallback(
-                        self.dummy_text(context)?,
-                        fallback_warning("writer", &error),
-                    ));
-                }
+        let prompt = self.build_prompt(context)?;
+        match self.runner.run_prompt_named("writer", &prompt) {
+            Ok(response) => return Ok(AgentRun::direct(response)),
+            Err(error) if !context.allow_dummy_fallback => return Err(error),
+            Err(error) => {
+                return Ok(AgentRun::fallback(
+                    self.dummy_text(context)?,
+                    fallback_warning("writer", &error),
+                ));
             }
         }
-
-        Ok(AgentRun::fallback(
-            self.dummy_text(context)?,
-            "writer used dummy fallback because codex access is disabled by configuration.",
-        ))
     }
 }

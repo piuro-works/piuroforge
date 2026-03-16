@@ -116,7 +116,7 @@ impl NovelBackend for CliNovelBackend {
         let mut warnings = Vec::new();
         let chapter_scene_target = request.novel.chapter_scene_target.max(1);
 
-        let planner = PlannerAgent::new(self.runner.clone(), true);
+        let planner = PlannerAgent::new(self.runner.clone());
         let planner_context = AgentContext {
             state: request.state.clone(),
             novel: request.novel.clone(),
@@ -141,7 +141,7 @@ impl NovelBackend for CliNovelBackend {
         scene_plan.scene_number = request.scene_number;
         scene_plan.chapter_role = scene_plan.effective_chapter_role(chapter_scene_target);
 
-        let writer = WriterAgent::new(self.runner.clone(), true);
+        let writer = WriterAgent::new(self.runner.clone());
         let writer_context = AgentContext {
             state: request.state.clone(),
             novel: request.novel.clone(),
@@ -170,7 +170,7 @@ impl NovelBackend for CliNovelBackend {
             status: "draft".to_string(),
         };
 
-        let editor = EditorAgent::new(self.runner.clone(), true);
+        let editor = EditorAgent::new(self.runner.clone());
         let editor_context = AgentContext {
             state: request.state,
             novel: request.novel,
@@ -204,7 +204,7 @@ impl NovelBackend for CliNovelBackend {
     }
 
     fn review_scene(&self, request: ReviewRequest) -> Result<ReviewResponse> {
-        let critic = CriticAgent::new(self.runner.clone(), true);
+        let critic = CriticAgent::new(self.runner.clone());
         let context = AgentContext {
             state: request.state,
             novel: request.novel,
@@ -233,7 +233,7 @@ impl NovelBackend for CliNovelBackend {
     }
 
     fn rewrite_scene(&self, request: RewriteRequest) -> Result<RewriteResponse> {
-        let editor = EditorAgent::new(self.runner.clone(), true);
+        let editor = EditorAgent::new(self.runner.clone());
         let context = AgentContext {
             state: request.state,
             novel: request.novel,

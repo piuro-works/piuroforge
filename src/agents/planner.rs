@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use std::sync::Arc;
 
 use crate::agents::base::{fallback_warning, Agent, AgentContext, AgentRun};
@@ -10,12 +10,11 @@ const PROMPT_OPEN_CONFLICTS_KEEP: usize = 10;
 #[derive(Clone)]
 pub struct PlannerAgent {
     runner: Arc<dyn PromptRunner>,
-    use_codex: bool,
 }
 
 impl PlannerAgent {
-    pub fn new(runner: Arc<dyn PromptRunner>, use_codex: bool) -> Self {
-        Self { runner, use_codex }
+    pub fn new(runner: Arc<dyn PromptRunner>) -> Self {
+        Self { runner }
     }
 
     fn build_prompt(&self, context: &AgentContext) -> Result<String> {
@@ -68,28 +67,17 @@ impl PlannerAgent {
 
 impl Agent for PlannerAgent {
     fn run(&self, context: &AgentContext) -> Result<AgentRun> {
-        if self.use_codex {
-            let prompt = self.build_prompt(context)?;
-            match self.runner.run_prompt_named("planner", &prompt) {
-                Ok(response) => return Ok(AgentRun::direct(response)),
-                Err(error) if !context.allow_dummy_fallback => return Err(error),
-                Err(error) => {
-                    return Ok(AgentRun::fallback(
-                        self.dummy_plan(context),
-                        fallback_warning("planner", &error),
-                    ));
-                }
+        let prompt = self.build_prompt(context)?;
+        match self.runner.run_prompt_named("planner", &prompt) {
+            Ok(response) => return Ok(AgentRun::direct(response)),
+            Err(error) if !context.allow_dummy_fallback => return Err(error),
+            Err(error) => {
+                return Ok(AgentRun::fallback(
+                    self.dummy_plan(context),
+                    fallback_warning("planner", &error),
+                ));
             }
         }
-
-        if context.allow_dummy_fallback {
-            return Ok(AgentRun::fallback(
-                self.dummy_plan(context),
-                "planner used dummy fallback because codex access is disabled by configuration.",
-            ));
-        }
-
-        Err(anyhow!("planner agent could not produce a scene plan"))
     }
 }
 

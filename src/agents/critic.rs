@@ -9,12 +9,11 @@ use crate::prompts::{render_template, CRITIC_TEMPLATE};
 #[derive(Clone)]
 pub struct CriticAgent {
     runner: Arc<dyn PromptRunner>,
-    use_codex: bool,
 }
 
 impl CriticAgent {
-    pub fn new(runner: Arc<dyn PromptRunner>, use_codex: bool) -> Self {
-        Self { runner, use_codex }
+    pub fn new(runner: Arc<dyn PromptRunner>) -> Self {
+        Self { runner }
     }
 
     fn build_prompt(&self, context: &AgentContext) -> Result<String> {
@@ -95,23 +94,16 @@ impl CriticAgent {
 
 impl Agent for CriticAgent {
     fn run(&self, context: &AgentContext) -> Result<AgentRun> {
-        if self.use_codex {
-            let prompt = self.build_prompt(context)?;
-            match self.runner.run_prompt_named("critic", &prompt) {
-                Ok(response) => return Ok(AgentRun::direct(response)),
-                Err(error) if !context.allow_dummy_fallback => return Err(error),
-                Err(error) => {
-                    return Ok(AgentRun::fallback(
-                        self.dummy_review(context)?,
-                        fallback_warning("critic", &error),
-                    ));
-                }
+        let prompt = self.build_prompt(context)?;
+        match self.runner.run_prompt_named("critic", &prompt) {
+            Ok(response) => return Ok(AgentRun::direct(response)),
+            Err(error) if !context.allow_dummy_fallback => return Err(error),
+            Err(error) => {
+                return Ok(AgentRun::fallback(
+                    self.dummy_review(context)?,
+                    fallback_warning("critic", &error),
+                ));
             }
         }
-
-        Ok(AgentRun::fallback(
-            self.dummy_review(context)?,
-            "critic used dummy fallback because codex access is disabled by configuration.",
-        ))
     }
 }
