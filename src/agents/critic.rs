@@ -96,14 +96,12 @@ impl Agent for CriticAgent {
     fn run(&self, context: &AgentContext) -> Result<AgentRun> {
         let prompt = self.build_prompt(context)?;
         match self.runner.run_prompt_named("critic", &prompt) {
-            Ok(response) => return Ok(AgentRun::direct(response)),
-            Err(error) if !context.allow_dummy_fallback => return Err(error),
-            Err(error) => {
-                return Ok(AgentRun::fallback(
-                    self.dummy_review(context)?,
-                    fallback_warning("critic", &error),
-                ));
-            }
+            Ok(response) => Ok(AgentRun::direct(response)),
+            Err(error) if !context.allow_dummy_fallback => Err(error),
+            Err(error) => Ok(AgentRun::fallback(
+                self.dummy_review(context)?,
+                fallback_warning("critic", &error),
+            )),
         }
     }
 }

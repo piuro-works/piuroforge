@@ -266,13 +266,11 @@ fn truncate_chars(value: &str, max_chars: usize) -> String {
     }
 
     let mut end = 0usize;
-    let mut count = 0usize;
-    for (index, ch) in value.char_indices() {
+    for (count, (index, ch)) in value.char_indices().enumerate() {
         if count == max_chars {
             break;
         }
         end = index + ch.len_utf8();
-        count += 1;
     }
 
     let mut truncated = value[..end].trim_end().to_string();

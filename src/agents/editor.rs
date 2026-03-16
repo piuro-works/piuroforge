@@ -77,14 +77,12 @@ impl Agent for EditorAgent {
     fn run(&self, context: &AgentContext) -> Result<AgentRun> {
         let prompt = self.build_prompt(context)?;
         match self.runner.run_prompt_named("editor", &prompt) {
-            Ok(response) => return Ok(AgentRun::direct(response)),
-            Err(error) if !context.allow_dummy_fallback => return Err(error),
-            Err(error) => {
-                return Ok(AgentRun::fallback(
-                    self.dummy_edit(context)?,
-                    fallback_warning("editor", &error),
-                ));
-            }
+            Ok(response) => Ok(AgentRun::direct(response)),
+            Err(error) if !context.allow_dummy_fallback => Err(error),
+            Err(error) => Ok(AgentRun::fallback(
+                self.dummy_edit(context)?,
+                fallback_warning("editor", &error),
+            )),
         }
     }
 }

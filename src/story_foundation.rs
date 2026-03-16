@@ -59,67 +59,84 @@ impl StoryFoundationStatus {
     }
 }
 
+struct FoundationDocSets {
+    brief: Vec<PathBuf>,
+    characters: Vec<PathBuf>,
+    world: Vec<PathBuf>,
+    plot: Vec<PathBuf>,
+    voice: Vec<PathBuf>,
+    research: Vec<PathBuf>,
+}
+
+impl FoundationDocSets {
+    fn collect(workspace_dir: &Path) -> Result<Self> {
+        let brief_dir = workspace_dir.join("01_Brief");
+        let characters_dir = workspace_dir.join("03_StoryBible").join("Characters");
+        let world_dir = workspace_dir.join("03_StoryBible").join("World");
+        let rules_dir = workspace_dir.join("03_StoryBible").join("Rules");
+        let timeline_dir = workspace_dir.join("03_StoryBible").join("Timeline");
+        let plot_dir = workspace_dir.join("03_StoryBible").join("Plot");
+        let voice_dir = workspace_dir.join("03_StoryBible").join("Voice");
+        let research_sources_dir = workspace_dir.join("04_Research").join("Sources");
+        let research_notes_dir = workspace_dir.join("04_Research").join("Notes");
+        let research_refs_dir = workspace_dir.join("04_Research").join("References");
+
+        let brief = collect_story_docs(&brief_dir)?;
+        let characters = collect_story_docs(&characters_dir)?;
+        let mut world = collect_story_docs(&world_dir)?;
+        world.extend(collect_story_docs(&rules_dir)?);
+        world.extend(collect_story_docs(&timeline_dir)?);
+        world.sort();
+
+        let plot = collect_story_docs(&plot_dir)?;
+        let voice = collect_story_docs(&voice_dir)?;
+
+        let mut research = collect_story_docs(&research_sources_dir)?;
+        research.extend(collect_story_docs(&research_notes_dir)?);
+        research.extend(collect_story_docs(&research_refs_dir)?);
+        research.sort();
+
+        Ok(Self {
+            brief,
+            characters,
+            world,
+            plot,
+            voice,
+            research,
+        })
+    }
+
+    fn status(&self) -> StoryFoundationStatus {
+        StoryFoundationStatus {
+            brief_docs: self.brief.len(),
+            character_docs: self.characters.len(),
+            world_docs: self.world.len(),
+            plot_docs: self.plot.len(),
+            voice_docs: self.voice.len(),
+            research_docs: self.research.len(),
+            score: foundation_score(
+                self.brief.len(),
+                self.characters.len(),
+                self.world.len(),
+                self.plot.len(),
+                self.voice.len(),
+                self.research.len(),
+            ),
+            missing_items: missing_items(
+                self.brief.len(),
+                self.characters.len(),
+                self.world.len(),
+                self.plot.len(),
+                self.voice.len(),
+            ),
+        }
+    }
+}
+
 pub fn load_story_foundation(workspace_dir: &Path) -> Result<StoryFoundationBundle> {
-    let brief_dir = workspace_dir.join("01_Brief");
-    let characters_dir = workspace_dir.join("03_StoryBible").join("Characters");
-    let world_dir = workspace_dir.join("03_StoryBible").join("World");
-    let rules_dir = workspace_dir.join("03_StoryBible").join("Rules");
-    let timeline_dir = workspace_dir.join("03_StoryBible").join("Timeline");
-    let plot_dir = workspace_dir.join("03_StoryBible").join("Plot");
-    let voice_dir = workspace_dir.join("03_StoryBible").join("Voice");
-    let research_sources_dir = workspace_dir.join("04_Research").join("Sources");
-    let research_notes_dir = workspace_dir.join("04_Research").join("Notes");
-    let research_refs_dir = workspace_dir.join("04_Research").join("References");
-
-    let brief_docs = collect_story_docs(&brief_dir)?;
-    let character_docs = collect_story_docs(&characters_dir)?;
-    let mut world_docs = collect_story_docs(&world_dir)?;
-    world_docs.extend(collect_story_docs(&rules_dir)?);
-    world_docs.extend(collect_story_docs(&timeline_dir)?);
-    world_docs.sort();
-
-    let plot_docs = collect_story_docs(&plot_dir)?;
-    let voice_docs = collect_story_docs(&voice_dir)?;
-
-    let mut research_docs = collect_story_docs(&research_sources_dir)?;
-    research_docs.extend(collect_story_docs(&research_notes_dir)?);
-    research_docs.extend(collect_story_docs(&research_refs_dir)?);
-    research_docs.sort();
-
-    let status = StoryFoundationStatus {
-        brief_docs: brief_docs.len(),
-        character_docs: character_docs.len(),
-        world_docs: world_docs.len(),
-        plot_docs: plot_docs.len(),
-        voice_docs: voice_docs.len(),
-        research_docs: research_docs.len(),
-        score: foundation_score(
-            brief_docs.len(),
-            character_docs.len(),
-            world_docs.len(),
-            plot_docs.len(),
-            voice_docs.len(),
-            research_docs.len(),
-        ),
-        missing_items: missing_items(
-            brief_docs.len(),
-            character_docs.len(),
-            world_docs.len(),
-            plot_docs.len(),
-            voice_docs.len(),
-        ),
-    };
-
-    let sections = render_foundation_sections(
-        workspace_dir,
-        &status,
-        &brief_docs,
-        &character_docs,
-        &world_docs,
-        &plot_docs,
-        &voice_docs,
-        &research_docs,
-    )?;
+    let docs = FoundationDocSets::collect(workspace_dir)?;
+    let status = docs.status();
+    let sections = render_foundation_sections(workspace_dir, &status, &docs)?;
     let prompt_context = render_prompt_context(&sections);
     let views = render_foundation_views(&sections);
 
@@ -208,20 +225,15 @@ struct RenderedFoundationSections {
 fn render_foundation_sections(
     workspace_dir: &Path,
     status: &StoryFoundationStatus,
-    brief_docs: &[PathBuf],
-    character_docs: &[PathBuf],
-    world_docs: &[PathBuf],
-    plot_docs: &[PathBuf],
-    voice_docs: &[PathBuf],
-    research_docs: &[PathBuf],
+    docs: &FoundationDocSets,
 ) -> Result<RenderedFoundationSections> {
     let missing = if status.missing_items.is_empty() {
         "None".to_string()
     } else {
         status.missing_items.join(" | ")
     };
-    let character_voice_guide = render_character_voice_guide(workspace_dir, character_docs)?;
-    let narrative_style_guide = render_narrative_style_guide(workspace_dir, voice_docs)?;
+    let character_voice_guide = render_character_voice_guide(workspace_dir, &docs.characters)?;
+    let narrative_style_guide = render_narrative_style_guide(workspace_dir, &docs.voice)?;
 
     Ok(RenderedFoundationSections {
         overview: format!(
@@ -230,14 +242,14 @@ fn render_foundation_sections(
             level = status.level(),
             missing = missing,
         ),
-        brief: render_section(workspace_dir, brief_docs, BRIEF_SECTION_LIMIT)?,
+        brief: render_section(workspace_dir, &docs.brief, BRIEF_SECTION_LIMIT)?,
         narrative_style_guide,
         character_voice_guide,
-        characters: render_section(workspace_dir, character_docs, BIBLE_SECTION_LIMIT)?,
-        world: render_section(workspace_dir, world_docs, BIBLE_SECTION_LIMIT)?,
-        plot: render_section(workspace_dir, plot_docs, PLOT_SECTION_LIMIT)?,
-        voice_docs: render_section(workspace_dir, voice_docs, VOICE_SECTION_LIMIT)?,
-        research: render_section(workspace_dir, research_docs, RESEARCH_SECTION_LIMIT)?,
+        characters: render_section(workspace_dir, &docs.characters, BIBLE_SECTION_LIMIT)?,
+        world: render_section(workspace_dir, &docs.world, BIBLE_SECTION_LIMIT)?,
+        plot: render_section(workspace_dir, &docs.plot, PLOT_SECTION_LIMIT)?,
+        voice_docs: render_section(workspace_dir, &docs.voice, VOICE_SECTION_LIMIT)?,
+        research: render_section(workspace_dir, &docs.research, RESEARCH_SECTION_LIMIT)?,
     })
 }
 
