@@ -72,7 +72,7 @@ curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh
 1. 터미널에서 한 번 `codex login` 실행
 2. `heeforge init <workspace>` 실행
 3. 워크스페이스에서 `heeforge doctor` 실행
-4. 첫 장면 전에 `01_Brief`, `03_StoryBible/Plot`, `03_StoryBible/Characters` 또는 `03_StoryBible/World`에 최소 문서 하나씩 채우기
+4. 첫 장면 전에 `01_Brief`, `03_StoryBible/Plot`, `03_StoryBible/Characters` 또는 `03_StoryBible/World`에 최소 문서 하나씩 채우고, 가능하면 `03_StoryBible/Voice`에 style/tone guide도 넣기
 5. `doctor`가 `ready`를 보여주면 HeeForge 설정은 끝
 6. 필요하면 `~/.config/heeforge/config.toml` 열기
 7. 실제 집필은 `allow_dummy_fallback = false` 유지
@@ -84,6 +84,7 @@ curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh
 
 `status`와 `next-scene`은 이제 workspace의 브리프/바이블/플롯 문서를 읽어 준비도를 계산한다. 준비도가 낮으면 경고를 보여주고, planner/writer/editor/critic도 그 문서들을 실제 프롬프트에 사용한다.
 특히 character 문서의 `Voice Notes`, `Speech Rhythm`, `Favorite Diction`, `Taboo Phrases`, `Emotional Leakage`, `Non-Negotiable Invariants` 섹션은 별도 voice guide로 추출돼 dialogue consistency에 직접 반영된다.
+프로젝트 전체 문체는 `03_StoryBible/Voice/` 아래 문서에서 읽는다. 여기에는 작가 이름이 아니라 문체 특징, 장르 스타일, 톤, narrative voice를 적는 쪽이 맞다.
 
 ## 빌드
 
@@ -195,6 +196,7 @@ git commit -m "Initialize novel workspace"
 │   └── Illustrations/
 ├── 03_StoryBible/
 │   ├── Characters/
+│   ├── Voice/
 │   ├── World/
 │   ├── Rules/
 │   ├── Timeline/

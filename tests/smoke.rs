@@ -33,6 +33,7 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
     assert!(workspace.join("02_Draft/Scenes").exists());
     assert!(workspace.join("02_Draft/Chapters").exists());
     assert!(workspace.join("03_StoryBible/Characters").exists());
+    assert!(workspace.join("03_StoryBible/Voice").exists());
     assert!(workspace.join("04_Research/Sources").exists());
     assert!(workspace.join("06_Review/Feedback").exists());
     assert!(workspace.join("06_Review/Revisions").exists());
@@ -45,6 +46,7 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
     assert!(workspace_readme.contains("First Run Checklist"));
     assert!(workspace_readme.contains("heeforge doctor"));
     assert!(workspace_readme.contains("project brief"));
+    assert!(workspace_readme.contains("style/tone guide"));
     assert!(workspace_readme.contains("If Doctor says ready"));
     assert!(workspace_readme.contains("allow_dummy_fallback = false"));
     assert!(workspace_readme.contains("approval prompts"));
@@ -58,6 +60,12 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
         std::fs::read_to_string(workspace.join("98_Templates/Character Template.md"))?;
     assert!(character_template.contains("## Speech Rhythm"));
     assert!(character_template.contains("## Taboo Phrases"));
+    let style_template =
+        std::fs::read_to_string(workspace.join("98_Templates/Style Guide Template.md"))?;
+    assert!(style_template.contains("## Style Principles"));
+    let tone_template =
+        std::fs::read_to_string(workspace.join("98_Templates/Tone Guide Template.md"))?;
+    assert!(tone_template.contains("## Tone Targets"));
     let review_template =
         std::fs::read_to_string(workspace.join("98_Templates/Review Pass Template.md"))?;
     assert!(review_template.contains("## Findings"));

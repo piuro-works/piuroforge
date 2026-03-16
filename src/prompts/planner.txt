@@ -17,6 +17,7 @@ Chapter policy:
 - middle scenes escalate pressure
 - final scene lands as a cliffhanger
 Use the story foundation below as the current canon. If it is thin, stay consistent with what exists and avoid inventing unnecessary lore.
+If the style guidance references descriptive traits, tone, or genre expectations, treat them as the house style. Do not imitate named authors.
 
 Story foundation:
 {{story_foundation}}

@@ -10,6 +10,7 @@ pub const SCAFFOLD_DIRS: &[&str] = &[
     "03_StoryBible/Rules",
     "03_StoryBible/Timeline",
     "03_StoryBible/Plot",
+    "03_StoryBible/Voice",
     "04_Research/Sources",
     "04_Research/Notes",
     "04_Research/References",
@@ -83,6 +84,18 @@ pub fn scaffold_files(title: &str) -> Vec<WorkspaceFile> {
             content: CHARACTER_TEMPLATE.to_string(),
         },
         WorkspaceFile {
+            relative_path: "98_Templates/Style Guide Template.md",
+            content: STYLE_GUIDE_TEMPLATE.to_string(),
+        },
+        WorkspaceFile {
+            relative_path: "98_Templates/Tone Guide Template.md",
+            content: TONE_GUIDE_TEMPLATE.to_string(),
+        },
+        WorkspaceFile {
+            relative_path: "98_Templates/Narrative Voice Template.md",
+            content: NARRATIVE_VOICE_TEMPLATE.to_string(),
+        },
+        WorkspaceFile {
             relative_path: "98_Templates/Source Template.md",
             content: SOURCE_TEMPLATE.to_string(),
         },
@@ -104,7 +117,7 @@ This workspace separates human-facing manuscript files from HeeForge runtime dat
 ## First Run Checklist\n\n\
 1. Open a terminal once and run `codex login`.\n\
 2. Run `heeforge doctor` in this workspace before the first real scene.\n\
-3. Before the first serious scene, fill at least one project brief, one plot note, and one character or world note.\n\
+3. Before the first serious scene, fill at least one project brief, one plot note, one character or world note, and one style/tone guide if possible.\n\
 4. Keep the default chapter rhythm simple at first: incident -> escalation -> cliffhanger.\n\
 5. If Doctor says ready, your HeeForge setup is finished. You can move on to `heeforge next-scene`.\n\
 6. Open `~/.config/heeforge/config.toml` if you want to review your HeeForge settings.\n\
@@ -120,12 +133,13 @@ If you run HeeForge through another assistant, IDE agent, or sandboxed tool, tha
 - `02_Draft/Fragments/`: loose fragments and salvageable prose\n\
 - `02_Draft/Illustrations/`: art references and illustration notes\n\
 - `03_StoryBible/`: characters, world, rules, timeline, and plot docs\n\
+- `03_StoryBible/Voice/`: project-level style, tone, and narrative voice guides\n\
 - `04_Research/`: sources, notes, and reference extracts\n\
 - `05_LLM/`: prompts, outputs, and session exports worth keeping\n\
 - `06_Review/Feedback/`: saved review reports for tracked editorial feedback\n\
 - `06_Review/Revisions/`: rewrite snapshots and revision records\n\
 - `07_Archive/`: snapshots and deprecated materials\n\
-- `98_Templates/`: reusable templates for briefs, scenes, and review passes\n\n\
+- `98_Templates/`: reusable templates for briefs, style guides, scenes, and review passes\n\n\
 ## Internal Runtime Data\n\n\
 - `.novel/workspace.json`: engine metadata\n\
 - `.novel/state/`: machine-managed workflow state\n\
@@ -198,9 +212,11 @@ Use this folder to separate durable canon from draft prose.
 - `Rules/`: invariants, style rules, motif rules, system constraints
 - `Timeline/`: chronology, event sequence, date logic
 - `Plot/`: arc outlines, chapter maps, structural plans
+- `Voice/`: project-level style guides, tone notes, and genre voice rules
 
 Keep these files readable in Git. They should be reference material for future drafting, not runtime logs.
 Character files should explicitly capture voice notes, speech rhythm, taboo phrases, and invariants so dialogue does not collapse into one tone.
+Use `Voice/` for safe style control through descriptive traits, genre expectations, and tone notes instead of named-author imitation.
 ";
 
 const RESEARCH_README: &str = "\
@@ -373,6 +389,72 @@ const CHARACTER_TEMPLATE: &str = "\
 ## Non-Negotiable Invariants
 
 ## Arc Pressure
+";
+
+const STYLE_GUIDE_TEMPLATE: &str = "\
+# Style Guide
+
+## Style Principles
+- Keep sentences relatively concise:
+- Show emotion through action and scene:
+- Avoid direct explanation of feeling:
+
+## Repetition Control
+- Words or phrases to minimize:
+- Sentence structures to vary:
+
+## Description Policy
+- How dense description should be:
+- How much metaphor is acceptable:
+
+## Dialogue Guidance
+- Default dialogue texture:
+- How much exposition dialogue can carry:
+
+## Avoid
+- Do not imitate named authors directly.
+- Do not overuse decorative modifiers.
+";
+
+const TONE_GUIDE_TEMPLATE: &str = "\
+# Tone Guide
+
+## Tone Targets
+- Primary tone:
+- Secondary tone:
+- Emotional temperature:
+
+## Scene Pressure
+- What should create tension:
+- What should never deflate tension too early:
+
+## Mood Anchors
+- Images or atmospheres to revisit:
+- What mood to avoid:
+
+## Genre Style
+- Pace expectations:
+- Reader-facing promise:
+";
+
+const NARRATIVE_VOICE_TEMPLATE: &str = "\
+# Narrative Voice
+
+## Narrative Voice
+- POV stance:
+- Distance from the protagonist:
+- Interior monologue density:
+
+## Genre Style
+- Contemporary webnovel / literary / thriller / fantasy expectations:
+- Readability target:
+
+## Dialogue Mode
+- How natural or heightened dialogue should feel:
+- How much subtext should sit under speech:
+
+## Safe Style Note
+- Use descriptive stylistic traits, tone, and genre expectations instead of named-author imitation.
 ";
 
 const SOURCE_TEMPLATE: &str = "\

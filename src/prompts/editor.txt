@@ -11,6 +11,7 @@ Goal: {{goal}}
 Conflict: {{conflict}}
 Outcome: {{outcome}}
 Keep continuity with the story foundation below.
+Use project-level style/tone guidance there as a house style reference, not as an author imitation target.
 Editing priorities:
 - reduce explanation that tells the emotion too directly
 - preserve concrete action beats around dialogue

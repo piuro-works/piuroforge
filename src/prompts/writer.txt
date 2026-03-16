@@ -12,6 +12,7 @@ Goal: {{goal}}
 Conflict: {{conflict}}
 Outcome: {{outcome}}
 Treat the story foundation below as canon and preserve continuity with it.
+Treat any project-level style guide there as safe house style built from descriptive traits, tone notes, and genre expectations rather than named-author imitation.
 Style requirements:
 - show the scene through action, sensory detail, and dialogue instead of blunt explanation
 - vary sentence length and avoid repetitive sentence openings

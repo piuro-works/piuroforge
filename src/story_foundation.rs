@@ -6,7 +6,9 @@ const BRIEF_SECTION_LIMIT: usize = 2_400;
 const BIBLE_SECTION_LIMIT: usize = 4_800;
 const PLOT_SECTION_LIMIT: usize = 3_200;
 const RESEARCH_SECTION_LIMIT: usize = 1_600;
+const VOICE_SECTION_LIMIT: usize = 2_400;
 const CHARACTER_VOICE_GUIDE_LIMIT: usize = 2_400;
+const NARRATIVE_STYLE_GUIDE_LIMIT: usize = 2_400;
 const FILE_EXCERPT_LIMIT: usize = 1_200;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,6 +23,7 @@ pub struct StoryFoundationStatus {
     pub character_docs: usize,
     pub world_docs: usize,
     pub plot_docs: usize,
+    pub voice_docs: usize,
     pub research_docs: usize,
     pub score: u32,
     pub missing_items: Vec<String>,
@@ -41,6 +44,7 @@ impl StoryFoundationStatus {
             + self.character_docs
             + self.world_docs
             + self.plot_docs
+            + self.voice_docs
             + self.research_docs
     }
 }
@@ -52,6 +56,7 @@ pub fn load_story_foundation(workspace_dir: &Path) -> Result<StoryFoundationBund
     let rules_dir = workspace_dir.join("03_StoryBible").join("Rules");
     let timeline_dir = workspace_dir.join("03_StoryBible").join("Timeline");
     let plot_dir = workspace_dir.join("03_StoryBible").join("Plot");
+    let voice_dir = workspace_dir.join("03_StoryBible").join("Voice");
     let research_sources_dir = workspace_dir.join("04_Research").join("Sources");
     let research_notes_dir = workspace_dir.join("04_Research").join("Notes");
     let research_refs_dir = workspace_dir.join("04_Research").join("References");
@@ -64,6 +69,7 @@ pub fn load_story_foundation(workspace_dir: &Path) -> Result<StoryFoundationBund
     world_docs.sort();
 
     let plot_docs = collect_story_docs(&plot_dir)?;
+    let voice_docs = collect_story_docs(&voice_dir)?;
 
     let mut research_docs = collect_story_docs(&research_sources_dir)?;
     research_docs.extend(collect_story_docs(&research_notes_dir)?);
@@ -75,12 +81,14 @@ pub fn load_story_foundation(workspace_dir: &Path) -> Result<StoryFoundationBund
         character_docs: character_docs.len(),
         world_docs: world_docs.len(),
         plot_docs: plot_docs.len(),
+        voice_docs: voice_docs.len(),
         research_docs: research_docs.len(),
         score: foundation_score(
             brief_docs.len(),
             character_docs.len(),
             world_docs.len(),
             plot_docs.len(),
+            voice_docs.len(),
             research_docs.len(),
         ),
         missing_items: missing_items(
@@ -88,6 +96,7 @@ pub fn load_story_foundation(workspace_dir: &Path) -> Result<StoryFoundationBund
             character_docs.len(),
             world_docs.len(),
             plot_docs.len(),
+            voice_docs.len(),
         ),
     };
 
@@ -98,6 +107,7 @@ pub fn load_story_foundation(workspace_dir: &Path) -> Result<StoryFoundationBund
         &character_docs,
         &world_docs,
         &plot_docs,
+        &voice_docs,
         &research_docs,
     )?;
 
@@ -112,15 +122,16 @@ fn foundation_score(
     character_docs: usize,
     world_docs: usize,
     plot_docs: usize,
+    voice_docs: usize,
     research_docs: usize,
 ) -> u32 {
     let mut score = 0;
 
     if brief_docs > 0 {
-        score += 25;
+        score += 20;
     }
     if plot_docs > 0 {
-        score += 30;
+        score += 25;
     }
     if character_docs > 0 {
         score += 20;
@@ -128,10 +139,13 @@ fn foundation_score(
     if world_docs > 0 {
         score += 15;
     }
+    if voice_docs > 0 {
+        score += 10;
+    }
     if research_docs > 0 {
         score += 5;
     }
-    if brief_docs + character_docs + world_docs + plot_docs >= 4 {
+    if brief_docs + character_docs + world_docs + plot_docs + voice_docs >= 4 {
         score += 5;
     }
 
@@ -143,6 +157,7 @@ fn missing_items(
     character_docs: usize,
     world_docs: usize,
     plot_docs: usize,
+    voice_docs: usize,
 ) -> Vec<String> {
     let mut missing = Vec::new();
 
@@ -158,6 +173,9 @@ fn missing_items(
     if world_docs == 0 {
         missing.push("world/rules/timeline notes in 03_StoryBible".to_string());
     }
+    if voice_docs == 0 {
+        missing.push("style/tone/voice guide in 03_StoryBible/Voice".to_string());
+    }
 
     missing
 }
@@ -169,6 +187,7 @@ fn render_prompt_context(
     character_docs: &[PathBuf],
     world_docs: &[PathBuf],
     plot_docs: &[PathBuf],
+    voice_docs: &[PathBuf],
     research_docs: &[PathBuf],
 ) -> Result<String> {
     let missing = if status.missing_items.is_empty() {
@@ -177,25 +196,114 @@ fn render_prompt_context(
         status.missing_items.join(" | ")
     };
     let character_voice_guide = render_character_voice_guide(workspace_dir, character_docs)?;
+    let narrative_style_guide = render_narrative_style_guide(workspace_dir, voice_docs)?;
 
     Ok(format!(
         "Story foundation score: {score}/100 ({level})\nMissing foundation items: {missing}\n\n\
 Project brief excerpts:\n{brief}\n\n\
+Narrative style guide:\n{style}\n\n\
 Character voice guide:\n{voice}\n\n\
 Character bible excerpts:\n{characters}\n\n\
 World and rule excerpts:\n{world}\n\n\
 Plot outline excerpts:\n{plot}\n\n\
+Voice and tone excerpts:\n{voice_docs}\n\n\
 Research excerpts:\n{research}",
         score = status.score,
         level = status.level(),
         missing = missing,
         brief = render_section(workspace_dir, brief_docs, BRIEF_SECTION_LIMIT)?,
+        style = narrative_style_guide,
         voice = character_voice_guide,
         characters = render_section(workspace_dir, character_docs, BIBLE_SECTION_LIMIT)?,
         world = render_section(workspace_dir, world_docs, BIBLE_SECTION_LIMIT)?,
         plot = render_section(workspace_dir, plot_docs, PLOT_SECTION_LIMIT)?,
+        voice_docs = render_section(workspace_dir, voice_docs, VOICE_SECTION_LIMIT)?,
         research = render_section(workspace_dir, research_docs, RESEARCH_SECTION_LIMIT)?,
     ))
+}
+
+fn render_narrative_style_guide(workspace_dir: &Path, docs: &[PathBuf]) -> Result<String> {
+    if docs.is_empty() {
+        return Ok("No project-level style guide provided yet.".to_string());
+    }
+
+    let mut rendered = String::new();
+    for path in docs {
+        let content = fs::read_to_string(path)
+            .with_context(|| format!("failed to read story foundation file {}", path.display()))?;
+        let profile = build_narrative_style_profile(&content);
+        if profile.is_empty() {
+            continue;
+        }
+
+        let relative = path
+            .strip_prefix(workspace_dir)
+            .unwrap_or(path)
+            .display()
+            .to_string();
+        let mut candidate = format!("### {relative}\n");
+        for line in profile {
+            candidate.push_str("- ");
+            candidate.push_str(&line);
+            candidate.push('\n');
+        }
+        candidate.push('\n');
+
+        if rendered.len() + candidate.len() > NARRATIVE_STYLE_GUIDE_LIMIT {
+            break;
+        }
+
+        rendered.push_str(&candidate);
+    }
+
+    if rendered.trim().is_empty() {
+        Ok("No explicit style/tone/voice sections found yet.".to_string())
+    } else {
+        Ok(rendered.trim().to_string())
+    }
+}
+
+fn build_narrative_style_profile(content: &str) -> Vec<String> {
+    let sections = extract_markdown_sections(content);
+    let mut profile = Vec::new();
+
+    push_profile_line(
+        &mut profile,
+        "Style principles",
+        first_section(&sections, &["Style Principles", "Style Guide", "Style"]),
+    );
+    push_profile_line(
+        &mut profile,
+        "Tone targets",
+        first_section(&sections, &["Tone Targets", "Tone", "Mood"]),
+    );
+    push_profile_line(
+        &mut profile,
+        "Genre style",
+        first_section(&sections, &["Genre Style", "Genre Expectations"]),
+    );
+    push_profile_line(
+        &mut profile,
+        "Narrative voice",
+        first_section(&sections, &["Narrative Voice", "Voice"]),
+    );
+    push_profile_line(
+        &mut profile,
+        "Dialogue mode",
+        first_section(&sections, &["Dialogue Mode", "Dialogue Guidance"]),
+    );
+    push_profile_line(
+        &mut profile,
+        "Avoid",
+        first_section(&sections, &["Avoid", "Do Not Do", "Restrictions"]),
+    );
+    push_profile_line(
+        &mut profile,
+        "Safe style note",
+        first_section(&sections, &["Safe Style Note", "Safety Note"]),
+    );
+
+    profile
 }
 
 fn render_character_voice_guide(workspace_dir: &Path, docs: &[PathBuf]) -> Result<String> {
@@ -540,6 +648,41 @@ mod tests {
         assert!(bundle
             .prompt_context
             .contains("Taboo phrases: Never begs. Never speaks in slogans."));
+
+        Ok(())
+    }
+
+    #[test]
+    fn narrative_style_guide_extracts_safe_style_sections() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let workspace = temp_dir.path();
+        fs::create_dir_all(workspace.join("03_StoryBible/Voice"))?;
+        fs::write(
+            workspace.join("03_StoryBible/Voice/Style Guide.md"),
+            "# Style Guide\n\n## Style Principles\n짧고 가독성 높은 문장. 감정을 직접 설명하지 않는다.\n\n## Tone Targets\n건조하지만 긴장감 있게 유지한다.\n\n## Genre Style\n현대 미스터리 스릴러의 빠른 전개.\n\n## Safe Style Note\n작가 이름 대신 문체 특징과 장르 기대치를 사용한다.\n",
+        )?;
+
+        let bundle = load_story_foundation(workspace)?;
+
+        assert_eq!(bundle.status.voice_docs, 1);
+        assert!(bundle
+            .status
+            .missing_items
+            .iter()
+            .any(|item| item.contains("project brief")));
+        assert!(bundle.prompt_context.contains("Narrative style guide:"));
+        assert!(bundle
+            .prompt_context
+            .contains("Style principles: 짧고 가독성 높은 문장."));
+        assert!(bundle
+            .prompt_context
+            .contains("Tone targets: 건조하지만 긴장감 있게 유지한다."));
+        assert!(bundle
+            .prompt_context
+            .contains("Genre style: 현대 미스터리 스릴러의 빠른 전개."));
+        assert!(bundle
+            .prompt_context
+            .contains("Safe style note: 작가 이름 대신 문체 특징과 장르 기대치를 사용한다."));
 
         Ok(())
     }

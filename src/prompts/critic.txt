@@ -16,6 +16,7 @@ Goal: {{goal}}
 Conflict: {{conflict}}
 Outcome: {{outcome}}
 Review against the story foundation below and call out continuity gaps when needed.
+Treat project-level style/tone guidance there as a descriptive house style, not a named-author target.
 Critique priorities:
 - show-vs-tell problems
 - repeated wording or repetitive sentence structures

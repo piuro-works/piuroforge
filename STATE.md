@@ -9,6 +9,7 @@
 - `doctor` 명령이 workspace 상태, 필수 novel 설정, Codex 연결, fallback 설정을 진단한다.
 - `NovelEngine`는 이제 workspace/state/file 제어를 맡고, Codex 기반 scene/review/rewrite/world generation은 주입 가능한 `NovelBackend` 경계 뒤로 분리됐다.
 - `novel.toml`은 작가용 주석과 함께 `chapter_scene_target` 기본값을 노출하며, 기본 drafting 구조를 `incident -> escalation -> cliffhanger`로 안내한다.
+- project-level 문체 제어를 위해 `03_StoryBible/Voice/` 문서를 foundation에 포함하고, named-author imitation 대신 style/tone/genre/voice guide를 읽도록 방향을 잡았다.
 - 워크스페이스 기반 저장 모델이 적용되어 사람용 소설 데이터는 워크스페이스 루트의 numbered folder에, 엔진 런타임 데이터는 `.novel/`에 분리 저장된다.
 - `1 workspace = 1 novel` 정책을 문서와 초기화 로직에 반영했다.
 - `heeforge init`은 소설 워크스페이스용 `.gitignore`를 생성해 엔진 Git과 소설 Git 분리를 돕는다.
@@ -37,6 +38,7 @@
 - smoke test가 injected stub backend로도 scene 생성이 되는지 검증해, control engine과 Codex generation backend 경계가 유지되는지 확인한다.
 - planner/writer/editor/critic 프롬프트 템플릿이 `src/prompts/`로 분리됐다.
 - planner/writer/editor/critic은 이제 scene의 `chapter_role`과 character voice guide를 함께 사용해 장면 역할과 대화 톤을 더 직접적으로 통제한다.
+- planner/writer/editor/critic은 `03_StoryBible/Voice/`의 safe style guide도 읽어 프로젝트 전체 문체를 descriptive traits와 genre/tone guidance 기준으로 맞춘다.
 - scene 생성 로그는 `.novel/logs/`에, review JSON과 rewrite snapshot은 `06_Review/`에 저장된다.
 - `next-chapter`는 scene 번호 연속성을 검증한다.
 - `next-scene`은 현재 chapter가 `chapter_scene_target`에 도달하면 추가 scene 생성을 막고, `next-chapter`는 scene 수가 target과 맞지 않으면 컴파일을 거부한다.

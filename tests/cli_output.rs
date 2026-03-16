@@ -145,7 +145,7 @@ fn init_json_creates_ready_workspace_without_prompting() -> Result<()> {
     assert_eq!(detail_value(&payload, "title"), Some("Fresh Novel"));
     assert_eq!(
         detail_value(&payload, "writer_setup"),
-        Some("Run `codex login` once, then run `heeforge doctor`. Before the first serious scene, fill a brief, a plot note, and a character or world note.")
+        Some("Run `codex login` once, then run `heeforge doctor`. Before the first serious scene, fill a brief, a plot note, a character or world note, and ideally a style or tone guide.")
     );
     assert_eq!(
         detail_value(&payload, "setup_done_when"),
@@ -162,6 +162,9 @@ fn init_json_creates_ready_workspace_without_prompting() -> Result<()> {
     assert!(workspace.join("novel.toml").exists());
     assert!(workspace.join("README.md").exists());
     assert!(workspace.join("98_Templates/Scene Template.md").exists());
+    assert!(workspace
+        .join("98_Templates/Style Guide Template.md")
+        .exists());
 
     Ok(())
 }

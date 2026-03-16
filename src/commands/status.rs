@@ -56,9 +56,10 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
         .detail("brief_doc_count", foundation.brief_docs.to_string())
         .detail(
             "story_bible_doc_count",
-            (foundation.character_docs + foundation.world_docs).to_string(),
+            (foundation.character_docs + foundation.world_docs + foundation.voice_docs).to_string(),
         )
         .detail("plot_doc_count", foundation.plot_docs.to_string())
+        .detail("voice_doc_count", foundation.voice_docs.to_string())
         .detail("research_doc_count", foundation.research_docs.to_string())
         .artifact("workspace_config", engine.workspace_config_path());
 
