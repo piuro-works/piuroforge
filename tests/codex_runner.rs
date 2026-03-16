@@ -82,3 +82,44 @@ fn run_prompt_writes_opt_in_prompt_log() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn run_prompt_named_prefers_output_last_message_file_when_present() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let script_path = temp_dir.path().join("json_progress_codex.sh");
+    let script = "#!/bin/sh\nOUT=\"\"\nwhile [ \"$#\" -gt 0 ]; do\n  if [ \"$1\" = \"--output-last-message\" ]; then\n    OUT=\"$2\"\n    shift 2\n    continue\n  fi\n  shift\ndone\necho '{\"type\":\"thread.started\"}'\necho '{\"type\":\"turn.started\"}'\nif [ -n \"$OUT\" ]; then\n  printf 'final from file\\n' > \"$OUT\"\nfi\n";
+    std::fs::write(&script_path, script)?;
+    let mut permissions = std::fs::metadata(&script_path)?.permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&script_path, permissions)?;
+
+    let runner = CodexRunner::new(script_path.display().to_string(), Duration::from_secs(5));
+    let response = runner.run_prompt_named("writer", "hello")?;
+
+    assert_eq!(response, "final from file");
+
+    Ok(())
+}
+
+#[test]
+fn critic_uses_longer_timeout_than_base_runner_timeout() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let script_path = temp_dir.path().join("slow_critic_codex.sh");
+    let script = "#!/bin/sh\nsleep 1\nprintf 'slow critic ok\\n'\n";
+    std::fs::write(&script_path, script)?;
+    let mut permissions = std::fs::metadata(&script_path)?.permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&script_path, permissions)?;
+
+    let runner = CodexRunner::new(
+        script_path.display().to_string(),
+        Duration::from_millis(200),
+    );
+    let started = Instant::now();
+    let response = runner.run_prompt_named("critic", "hello")?;
+
+    assert_eq!(response, "slow critic ok");
+    assert!(started.elapsed() >= Duration::from_millis(900));
+
+    Ok(())
+}

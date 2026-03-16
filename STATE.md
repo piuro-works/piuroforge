@@ -45,6 +45,7 @@
 - `next-scene`은 현재 chapter가 `chapter_scene_target`에 도달하면 추가 scene 생성을 막고, `next-chapter`는 scene 수가 target과 맞지 않으면 컴파일을 거부한다.
 - `CodexRunner`는 호출 실패 시 1회 재시도한다.
 - `CodexRunner`는 응답 timeout을 넘기면 subprocess를 강제 종료한다.
+- `CodexRunner`는 `--json` + `--output-last-message` 조합으로 Codex 진행 이벤트를 읽고, agent별 더 긴 timeout(writer/critic 등)과 stderr progress 표시를 사용한다.
 - 바이너리 테스트가 하위 디렉터리 실행 시 nearest workspace 자동 탐색을 검증한다.
 - 바이너리 테스트가 `rewrite`/`approve`의 JSON 출력, 산출물 보존, 상태 전이를 검증한다.
 - 바이너리 테스트가 `init`, `status`, `next-scene`, `review`, `rewrite`, `approve`, `next-chapter`, `expand-world`, `memory`, `show` 전 커맨드의 JSON 계약을 검증한다.

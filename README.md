@@ -65,6 +65,8 @@ curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh
 
 실제 codex 기반 생성/리뷰/수정을 쓰려면 먼저 `codex login`이 되어 있어야 한다.
 기본적으로 `codex exec` 호출은 120초 timeout이 걸려 있으며, 응답이 없으면 subprocess를 종료하고 명확한 에러를 반환한다.
+다만 내부적으로는 agent 역할에 따라 timeout을 다르게 잡는다. writer/critic/expand-world는 planner보다 더 긴 timeout을 사용한다.
+실행 중에는 Codex 진행 상태를 `stderr`로 흘려서, 최종 JSON 출력 계약을 깨지 않으면서도 사용자가 중간 진행을 볼 수 있게 한다.
 기본값에서는 `codex` 실패가 조용히 placeholder prose로 바뀌지 않는다. placeholder output이 필요하면 전역 설정 `allow_dummy_fallback = true` 또는 `HEEFORGE_ALLOW_DUMMY=true`를 사용자가 직접 켜야 하고, 그 경우에도 CLI 출력과 로그에 fallback warning이 남는다.
 
 작가용 최소 설정 순서:
