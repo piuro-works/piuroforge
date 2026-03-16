@@ -137,7 +137,7 @@ impl NovelEngine {
         self.memory_manager
             .overwrite_active_memory(&self.render_active_memory(&state, &final_scene))?;
         self.memory_manager
-            .append_story_memory(&self.render_story_memory_entry(&final_scene))?;
+            .upsert_story_memory_entry(&self.render_story_memory_entry(&final_scene))?;
 
         let mut warnings = generated.warnings;
         if let Some(warning) = story_foundation_warning(&foundation.status) {
@@ -245,6 +245,8 @@ impl NovelEngine {
             self.memory_manager
                 .overwrite_active_memory(&self.render_active_memory(&state, &rewritten_scene))?;
         }
+        self.memory_manager
+            .upsert_story_memory_entry(&self.render_story_memory_entry(&rewritten_scene))?;
 
         self.memory_manager.append_story_memory(&format!(
             "## Rewrite {}\n- Instruction: {}\n- Status: draft\n",
@@ -271,6 +273,10 @@ impl NovelEngine {
         self.save_scene(&approved)?;
         self.state_manager.mark_scene_approved(&mut state, scene_id);
         self.state_manager.save_state(&state)?;
+        self.memory_manager
+            .overwrite_active_memory(&self.render_active_memory(&state, &approved))?;
+        self.memory_manager
+            .upsert_story_memory_entry(&self.render_story_memory_entry(&approved))?;
         Ok(())
     }
 

@@ -103,6 +103,38 @@ impl MemoryManager {
         append_string(&self.story_path, &formatted)
     }
 
+    pub fn upsert_story_memory_entry(&self, entry: &str) -> Result<()> {
+        self.ensure_files()?;
+        let trimmed = entry.trim();
+        let Some(heading_line) = trimmed.lines().next() else {
+            return Ok(());
+        };
+        let Some(heading) = heading_line.strip_prefix("## ") else {
+            return self.append_story_memory(entry);
+        };
+        let body = trimmed
+            .lines()
+            .skip(1)
+            .collect::<Vec<_>>()
+            .join("\n")
+            .trim()
+            .to_string();
+
+        let existing = read_string_if_exists(&self.story_path)?
+            .unwrap_or_else(|| "# Story Memory\n\n".to_string());
+        let (header, mut sections) = parse_story_memory_sections(&existing);
+        if let Some(section) = sections.iter_mut().find(|section| section.heading == heading.trim()) {
+            section.body = body;
+        } else {
+            sections.push(StoryMemorySection {
+                heading: heading.trim().to_string(),
+                body,
+            });
+        }
+
+        write_string(&self.story_path, &render_story_memory_document(&header, &sections))
+    }
+
     pub fn overwrite_active_memory(&self, content: &str) -> Result<()> {
         self.ensure_files()?;
         write_string(&self.active_path, content)
@@ -159,6 +191,27 @@ fn compact_story_memory_for_prompt(story_memory: &str) -> String {
         .join("\n\n");
 
     format!("{base}\n{body}\n")
+}
+
+fn render_story_memory_document(header: &str, sections: &[StoryMemorySection]) -> String {
+    let header = if header.trim().is_empty() {
+        "# Story Memory".to_string()
+    } else {
+        header.trim_end().to_string()
+    };
+
+    let mut rendered = format!("{header}\n");
+    for section in sections {
+        rendered.push('\n');
+        rendered.push_str("## ");
+        rendered.push_str(section.heading.trim());
+        rendered.push('\n');
+        if !section.body.trim().is_empty() {
+            rendered.push_str(section.body.trim_end());
+            rendered.push('\n');
+        }
+    }
+    rendered
 }
 
 fn parse_story_memory_sections(story_memory: &str) -> (String, Vec<StoryMemorySection>) {
@@ -310,7 +363,10 @@ impl StoryMemorySection {
 
 #[cfg(test)]
 mod tests {
-    use super::compact_story_memory_for_prompt;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::{MemoryManager, compact_story_memory_for_prompt};
 
     #[test]
     fn keeps_story_memory_untouched_when_under_budget() {
@@ -347,5 +403,35 @@ mod tests {
         assert!(compacted.contains("## Scene scene_001_014: Scene 14"));
         assert!(!compacted.contains("## Scene scene_001_001: Scene 1"));
         assert!(compacted.len() <= super::PROMPT_STORY_MEMORY_CHAR_LIMIT + 256);
+    }
+
+    #[test]
+    fn upsert_story_memory_entry_replaces_existing_section() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time should move forward")
+            .as_nanos();
+        let temp_dir = std::env::temp_dir().join(format!("piuroforge-memory-test-{unique}"));
+        let manager = MemoryManager::new(temp_dir.clone());
+        manager.ensure_files().expect("memory files should initialize");
+
+        manager
+            .upsert_story_memory_entry(
+                "## Scene scene_001_001: First Pass\n- Goal: old\n- Outcome: old\n",
+            )
+            .expect("first upsert should succeed");
+        manager
+            .upsert_story_memory_entry(
+                "## Scene scene_001_001: First Pass\n- Goal: new\n- Outcome: new\n",
+            )
+            .expect("second upsert should replace the section");
+
+        let story =
+            fs::read_to_string(temp_dir.join("story_memory.md")).expect("story memory readable");
+        assert_eq!(story.matches("## Scene scene_001_001: First Pass").count(), 1);
+        assert!(story.contains("- Goal: new"));
+        assert!(!story.contains("- Goal: old"));
+
+        fs::remove_dir_all(temp_dir).expect("temp directory should be removable");
     }
 }

@@ -54,6 +54,7 @@ impl StateManager {
         state.current_bundle = scene.bundle;
         state.current_scene = scene.scene_number;
         state.current_goal = Some(scene.goal.clone());
+        state.current_outcome = Some(scene.outcome.clone());
         self.update_current_scene_id(state, Some(scene.id.clone()));
         self.update_stage(state, "scene_draft_ready");
 
@@ -76,6 +77,7 @@ impl StateManager {
         state.current_bundle += 1;
         state.current_scene = 0;
         state.current_goal = None;
+        state.current_outcome = None;
         state.current_scene_id = None;
         self.update_stage(state, "bundle_ready");
     }

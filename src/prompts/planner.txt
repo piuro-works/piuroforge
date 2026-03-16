@@ -9,13 +9,19 @@ Premise: {{premise}}
 Protagonist: {{protagonist_name}}
 Language: {{language}}
 Current stage: {{stage}}
-Current goal: {{current_goal}}
+Previous scene goal: {{previous_scene_goal}}
+Previous scene outcome: {{previous_scene_outcome}}
 Open conflicts: {{open_conflicts}}
 Required bundle role for this scene: {{bundle_role}}
 Bundle policy:
 - scene 1 triggers the incident
 - middle scenes escalate pressure
 - final scene lands as a cliffhanger
+Transition policy:
+- treat the previous scene outcome as the handoff into this scene
+- change at least one of these between consecutive scenes: immediate objective, dominant location, pressure source, or reward/payoff
+- do not simply retry the exact same tactical objective in the exact same place unless repetition itself is the explicit point of the story foundation
+- if the previous scene ended with a failed attempt, convert that failure into a narrower consequence, new route, new cost, or new relationship pressure rather than replaying the same checkpoint
 Use the story foundation below as the current canon. If it is thin, stay consistent with what exists and avoid inventing unnecessary lore.
 If the style guidance references descriptive traits, tone, or genre expectations, treat them as the house style. Do not imitate named authors.
 

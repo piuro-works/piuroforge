@@ -21,9 +21,14 @@ impl PlannerAgent {
         let bundle = context.state.current_bundle;
         let next_scene = context.state.current_scene + 1;
         let bundle_scene_target = context.novel.bundle_scene_target.max(1);
-        let current_goal = context
+        let previous_scene_goal = context
             .state
             .current_goal
+            .clone()
+            .unwrap_or_else(|| "None".to_string());
+        let previous_scene_outcome = context
+            .state
+            .current_outcome
             .clone()
             .unwrap_or_else(|| "None".to_string());
         let open_conflicts = render_open_conflicts(&context.state.open_conflicts);
@@ -43,7 +48,8 @@ impl PlannerAgent {
                 ("protagonist_name", context.novel.protagonist_name.as_str()),
                 ("language", context.novel.language.as_str()),
                 ("stage", context.state.stage.as_str()),
-                ("current_goal", current_goal.as_str()),
+                ("previous_scene_goal", previous_scene_goal.as_str()),
+                ("previous_scene_outcome", previous_scene_outcome.as_str()),
                 ("open_conflicts", open_conflicts.as_str()),
                 ("story_foundation", context.story_foundation.as_str()),
                 ("core_memory", context.memory.core_memory.as_str()),
@@ -99,7 +105,23 @@ fn render_open_conflicts(conflicts: &[String]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::render_open_conflicts;
+    use std::sync::Arc;
+
+    use anyhow::Result;
+
+    use super::{PlannerAgent, render_open_conflicts};
+    use crate::agents::base::AgentContext;
+    use crate::config::NovelSettings;
+    use crate::llm_runner::PromptRunner;
+    use crate::models::{MemoryBundle, StoryState};
+
+    struct NoopRunner;
+
+    impl PromptRunner for NoopRunner {
+        fn run_prompt_named(&self, _label: &str, _prompt: &str) -> Result<String> {
+            unreachable!("prompt runner should not be called in planner prompt tests")
+        }
+    }
 
     #[test]
     fn keeps_open_conflicts_unchanged_when_short() {
@@ -118,5 +140,47 @@ mod tests {
         assert!(rendered.contains("conflict-14"));
         assert!(!rendered.contains("conflict-1 |"));
         assert!(!rendered.contains("conflict-2 |"));
+    }
+
+    #[test]
+    fn build_prompt_includes_previous_scene_context_and_transition_rules() {
+        let planner = PlannerAgent::new(Arc::new(NoopRunner));
+        let mut state = StoryState::default();
+        state.current_bundle = 1;
+        state.current_scene = 1;
+        state.stage = "scene_approved".to_string();
+        state.current_goal = Some("Keep the last ration and pass.".to_string());
+        state.current_outcome = Some("The ration and pass are lost, so the protagonist must flee."
+            .to_string());
+        state.open_conflicts = vec!["The city tightens registration and marks non-humans.".to_string()];
+
+        let context = AgentContext {
+            state,
+            novel: NovelSettings {
+                title: "Test".to_string(),
+                genre: "Fantasy".to_string(),
+                tone: "Harsh".to_string(),
+                premise: "Escape the city.".to_string(),
+                protagonist_name: "Ulaanbaatar".to_string(),
+                language: "ko".to_string(),
+                ..NovelSettings::default()
+            },
+            memory: MemoryBundle::default(),
+            story_foundation: "Episode 2 should move into the drainage alleys, not retry the gate."
+                .to_string(),
+            scene_plan: None,
+            scene: None,
+            instruction: None,
+            allow_dummy_fallback: false,
+        };
+
+        let prompt = planner.build_prompt(&context).expect("planner prompt should render");
+
+        assert!(prompt.contains("Previous scene goal: Keep the last ration and pass."));
+        assert!(prompt.contains(
+            "Previous scene outcome: The ration and pass are lost, so the protagonist must flee."
+        ));
+        assert!(prompt.contains("do not simply retry the exact same tactical objective"));
+        assert!(prompt.contains("change at least one of these between consecutive scenes"));
     }
 }

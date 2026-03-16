@@ -58,6 +58,10 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
         )
         .detail("current_goal", state.current_goal.as_deref().unwrap_or("-"))
         .detail(
+            "current_outcome",
+            state.current_outcome.as_deref().unwrap_or("-"),
+        )
+        .detail(
             "open_conflict_count",
             state.open_conflicts.len().to_string(),
         )

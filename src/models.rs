@@ -27,6 +27,7 @@ pub struct StoryState {
     pub current_scene: u32,
     pub stage: String,
     pub current_goal: Option<String>,
+    pub current_outcome: Option<String>,
     pub open_conflicts: Vec<String>,
     pub current_scene_id: Option<String>,
 }
@@ -39,6 +40,7 @@ impl Default for StoryState {
             current_scene: 0,
             stage: "initialized".to_string(),
             current_goal: None,
+            current_outcome: None,
             open_conflicts: Vec::new(),
             current_scene_id: None,
         }
