@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::sync::Arc;
 
 use crate::agents::base::{strip_code_fences, Agent, AgentContext};
 use crate::agents::critic::CriticAgent;
@@ -7,6 +8,7 @@ use crate::agents::planner::PlannerAgent;
 use crate::agents::writer::WriterAgent;
 use crate::codex_runner::CodexRunner;
 use crate::config::NovelSettings;
+use crate::llm_runner::PromptRunner;
 use crate::models::{
     chapter_role_for, normalize_review_score, review_score_from_issue_count, MemoryBundle,
     ReviewIssue, ReviewOutcome, Scene, ScenePlan, StoryState,
@@ -94,18 +96,22 @@ pub struct WorldExpansionResponse {
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
-pub struct CodexNovelBackend {
-    runner: CodexRunner,
+#[derive(Clone)]
+pub struct CliNovelBackend {
+    runner: Arc<dyn PromptRunner>,
 }
 
-impl CodexNovelBackend {
-    pub fn new(runner: CodexRunner) -> Self {
+impl CliNovelBackend {
+    pub fn new(runner: Arc<dyn PromptRunner>) -> Self {
         Self { runner }
+    }
+
+    pub fn codex(runner: CodexRunner) -> Self {
+        Self::new(Arc::new(runner))
     }
 }
 
-impl NovelBackend for CodexNovelBackend {
+impl NovelBackend for CliNovelBackend {
     fn generate_scene(&self, request: SceneGenerationRequest) -> Result<SceneGenerationResponse> {
         let mut warnings = Vec::new();
         let chapter_scene_target = request.novel.chapter_scene_target.max(1);
@@ -292,6 +298,37 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
     }
 }
 
+#[derive(Clone)]
+pub struct CodexNovelBackend {
+    inner: CliNovelBackend,
+}
+
+impl CodexNovelBackend {
+    pub fn new(runner: CodexRunner) -> Self {
+        Self {
+            inner: CliNovelBackend::codex(runner),
+        }
+    }
+}
+
+impl NovelBackend for CodexNovelBackend {
+    fn generate_scene(&self, request: SceneGenerationRequest) -> Result<SceneGenerationResponse> {
+        self.inner.generate_scene(request)
+    }
+
+    fn review_scene(&self, request: ReviewRequest) -> Result<ReviewResponse> {
+        self.inner.review_scene(request)
+    }
+
+    fn rewrite_scene(&self, request: RewriteRequest) -> Result<RewriteResponse> {
+        self.inner.rewrite_scene(request)
+    }
+
+    fn expand_world(&self, request: WorldExpansionRequest) -> Result<WorldExpansionResponse> {
+        self.inner.expand_world(request)
+    }
+}
+
 fn parse_scene_plan(
     raw: &str,
     chapter: u32,
@@ -401,7 +438,16 @@ fn truncate_chars(value: &str, max_chars: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_review_outcome;
+    use super::{
+        parse_review_outcome, CliNovelBackend, NovelBackend, ReviewRequest, RewriteRequest,
+        SceneGenerationRequest, WorldExpansionRequest,
+    };
+    use crate::config::NovelSettings;
+    use crate::llm_runner::PromptRunner;
+    use crate::models::{MemoryBundle, StoryState};
+    use anyhow::{anyhow, Result};
+    use std::collections::{BTreeMap, VecDeque};
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn parse_review_outcome_reads_object_score() {
@@ -423,5 +469,136 @@ mod tests {
         assert_eq!(outcome.score, 88);
         assert_eq!(outcome.issues.len(), 1);
         assert_eq!(outcome.issues[0].issue_type, "logic");
+    }
+
+    #[derive(Clone)]
+    struct FixturePromptRunner {
+        outputs: Arc<Mutex<BTreeMap<String, VecDeque<String>>>>,
+    }
+
+    impl FixturePromptRunner {
+        fn from_pairs(pairs: &[(&str, &str)]) -> Self {
+            let mut outputs = BTreeMap::new();
+            for (label, output) in pairs {
+                outputs
+                    .entry((*label).to_string())
+                    .or_insert_with(VecDeque::new)
+                    .push_back((*output).to_string());
+            }
+
+            Self {
+                outputs: Arc::new(Mutex::new(outputs)),
+            }
+        }
+    }
+
+    impl PromptRunner for FixturePromptRunner {
+        fn run_prompt_named(&self, label: &str, _prompt: &str) -> Result<String> {
+            let mut outputs = self.outputs.lock().expect("fixture runner mutex");
+            let queue = outputs
+                .get_mut(label)
+                .ok_or_else(|| anyhow!("no fixture output registered for {label}"))?;
+            queue
+                .pop_front()
+                .ok_or_else(|| anyhow!("fixture outputs exhausted for {label}"))
+        }
+    }
+
+    #[test]
+    fn cli_novel_backend_supports_fixture_runner_integration() -> Result<()> {
+        let backend = CliNovelBackend::new(Arc::new(FixturePromptRunner::from_pairs(&[
+            (
+                "planner",
+                r#"{"chapter":1,"scene_number":1,"short_title":"Signal at the Gate","chapter_role":"incident","goal":"The investigator confirms the missing courier route.","conflict":"A clerk refuses access without a dead supervisor's code.","outcome":"The route is found, but the code points to a sealed dock ledger."}"#,
+            ),
+            (
+                "writer",
+                "Yunseo leaned over the registry desk and found the courier route hidden under a dead supervisor's lock code.",
+            ),
+            (
+                "editor",
+                "Yunseo leaned over the registry desk and found the courier route hidden behind a dead supervisor's lock code.",
+            ),
+            (
+                "critic",
+                r#"{"score":91,"issues":[{"issue_type":"pacing","description":"Tighten the second paragraph.","line_start":2,"line_end":3}]}"#,
+            ),
+            (
+                "editor",
+                "Yunseo revised the registry exchange until the dead supervisor's lock code landed with sharper pressure.",
+            ),
+            (
+                "expand-world",
+                "# World Expansion\n\n## Dock Ledger Protocol\nThe sealed dock ledger can only be opened by the night quartermaster and the memory court auditor.\n",
+            ),
+        ])));
+
+        let state = StoryState::default();
+        let novel = NovelSettings {
+            title: "Glass Harbor".to_string(),
+            genre: "Mystery".to_string(),
+            tone: "Tense, atmospheric".to_string(),
+            premise: "An investigator follows edited records to find a missing sibling."
+                .to_string(),
+            protagonist_name: "Yunseo".to_string(),
+            language: "ko".to_string(),
+            chapter_scene_target: 3,
+            ..NovelSettings::default()
+        };
+        let memory = MemoryBundle {
+            core_memory: "# Core Memory\n".to_string(),
+            story_memory: "# Story Memory\n".to_string(),
+            active_memory: "# Active Memory\n".to_string(),
+        };
+
+        let generated = backend.generate_scene(SceneGenerationRequest {
+            state: state.clone(),
+            novel: novel.clone(),
+            memory: memory.clone(),
+            planner_story_foundation: "Plot foundation".to_string(),
+            writer_story_foundation: "Writer foundation".to_string(),
+            editor_story_foundation: "Editor foundation".to_string(),
+            chapter: 1,
+            scene_number: 1,
+            scene_id: "scene_001_001".to_string(),
+            allow_dummy_fallback: false,
+        })?;
+        assert_eq!(generated.final_scene.id, "scene_001_001");
+        assert_eq!(generated.final_scene.short_title, "Signal at the Gate");
+        assert!(generated
+            .final_scene
+            .text
+            .contains("dead supervisor's lock code"));
+
+        let reviewed = backend.review_scene(ReviewRequest {
+            state: state.clone(),
+            novel: novel.clone(),
+            memory: memory.clone(),
+            critic_story_foundation: "Critic foundation".to_string(),
+            scene: generated.final_scene.clone(),
+            allow_dummy_fallback: false,
+        })?;
+        assert_eq!(reviewed.score, 91);
+        assert_eq!(reviewed.issues.len(), 1);
+
+        let rewritten = backend.rewrite_scene(RewriteRequest {
+            state,
+            novel,
+            memory: memory.clone(),
+            editor_story_foundation: "Editor foundation".to_string(),
+            scene: generated.final_scene,
+            instruction: "Sharpen the pressure in the registry exchange.".to_string(),
+            allow_dummy_fallback: false,
+        })?;
+        assert!(rewritten.rewritten_scene.text.contains("sharper pressure"));
+
+        let expanded = backend.expand_world(WorldExpansionRequest {
+            memory,
+            world_story_foundation: "World foundation".to_string(),
+            allow_dummy_fallback: false,
+        })?;
+        assert!(expanded.expansion.contains("Dock Ledger Protocol"));
+
+        Ok(())
     }
 }

@@ -262,6 +262,7 @@ Git 확인용으로는 위 바깥 구조와 `novel.toml`을 커밋하고, `.nove
 `init`은 루트 `README.md`, 각 주요 섹션 `README.md`, 그리고 `98_Templates/`의 starter template 파일도 함께 생성한다.
 Git을 잘 모르는 사용자라면 전역 설정 `workspace_auto_commit = true` 또는 `HEEFORGE_WORKSPACE_AUTO_COMMIT=true`로 workspace Git 자동 초기화/자동 커밋을 켤 수 있다. 이 경우 `init`, `next-scene`, `review`, `rewrite`, `approve`, `next-chapter`, `expand-world` 같은 변경 명령 뒤에 workspace repo가 자동으로 commit된다.
 내부 구현은 workspace 제어 엔진과 Codex 소설 생성 backend를 분리했지만, 사용자는 계속 같은 `heeforge` 명령만 쓰면 된다. backend 분리는 사용자 절차를 늘리기 위한 것이 아니라, 향후 worker/bridge 구조를 숨긴 채 안정성을 높이기 위한 내부 경계다.
+현재 기본 런타임 backend는 `codex_cli` 하나다. 다만 내부 LLM 호출 경계는 `PromptRunner`와 `CliNovelBackend`로 분리되어 있어서, 다른 사람이 Gemini CLI, Claude CLI, Copilot CLI 같은 대체 runner를 추가하더라도 planner/writer/editor/critic orchestration은 재사용할 수 있다. 이런 확장은 사용자 setup flow를 바꾸지 않아야 하며, fake runner 기반 통합 테스트를 함께 추가하는 것을 권장한다.
 
 워크스페이스 안에서 작업:
 
@@ -301,6 +302,7 @@ heeforge --workspace ~/novels/my-first-novel --format json --agent status
 ```
 
 `capabilities`는 각 명령의 workspace 필요 여부, Codex 필요 여부, workspace 변경 여부를 JSON으로 알려준다.
+현재 JSON payload에는 기본 auth mode와 setup flow도 포함되므로, 외부 에이전트는 README를 파싱하지 않고도 `codex login -> init -> doctor` 순서를 추론할 수 있다.
 
 ## OpenClaw 같은 에이전트
 

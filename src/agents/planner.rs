@@ -1,19 +1,20 @@
 use anyhow::{anyhow, Result};
+use std::sync::Arc;
 
 use crate::agents::base::{fallback_warning, Agent, AgentContext, AgentRun};
-use crate::codex_runner::CodexRunner;
+use crate::llm_runner::PromptRunner;
 use crate::prompts::{render_template, PLANNER_TEMPLATE};
 
 const PROMPT_OPEN_CONFLICTS_KEEP: usize = 10;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PlannerAgent {
-    runner: CodexRunner,
+    runner: Arc<dyn PromptRunner>,
     use_codex: bool,
 }
 
 impl PlannerAgent {
-    pub fn new(runner: CodexRunner, use_codex: bool) -> Self {
+    pub fn new(runner: Arc<dyn PromptRunner>, use_codex: bool) -> Self {
         Self { runner, use_codex }
     }
 

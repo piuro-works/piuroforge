@@ -10,6 +10,8 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
+use crate::llm_runner::PromptRunner;
+
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
 
@@ -367,6 +369,12 @@ impl CodexRunner {
         })();
 
         let _ = result;
+    }
+}
+
+impl PromptRunner for CodexRunner {
+    fn run_prompt_named(&self, label: &str, prompt: &str) -> Result<String> {
+        CodexRunner::run_prompt_named(self, label, prompt)
     }
 }
 
