@@ -96,13 +96,17 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
 
     let missing = engine.missing_required_novel_fields();
     let mut output = if missing.is_empty() {
-        CommandOutput::ok(
+        let output = CommandOutput::ok(
             "init",
             engine.workspace_dir(),
             "Novel workspace initialized and ready for scene generation.",
         )
-        .next_step(super::workspace_command(engine, "next-scene"))
-        .next_step("git init")
+        .next_step(super::workspace_command(engine, "next-scene"));
+        if engine.workspace_auto_commit_enabled() {
+            output
+        } else {
+            output.next_step("git init")
+        }
     } else {
         CommandOutput::ok(
             "init",
@@ -137,7 +141,11 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
         .artifact("workspace_config", engine.workspace_config_path())
         .artifact("global_config", engine.global_config_path());
 
-    Ok(output)
+    Ok(super::finalize_workspace_change(
+        engine,
+        output,
+        "heeforge: initialize workspace",
+    ))
 }
 
 fn apply_option(target: &mut String, value: Option<&String>) {

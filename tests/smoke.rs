@@ -16,6 +16,7 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
     let global_config = std::fs::read_to_string(temp_dir.path().join("config-home/config.toml"))?;
     assert!(global_config.contains("codex_command = \"codex\""));
     assert!(global_config.contains("log_prompts = false"));
+    assert!(global_config.contains("workspace_auto_commit = false"));
     assert!(workspace.join(".novel/workspace.json").exists());
     assert!(workspace.join("novel.toml").exists());
     assert!(workspace.join("README.md").exists());
@@ -216,7 +217,7 @@ fn config_layers_remain_separated() -> Result<()> {
     std::fs::create_dir_all(&global_dir)?;
     std::fs::write(
         global_dir.join("config.toml"),
-        "version = 1\ncodex_command = \"custom-codex\"\nallow_dummy_fallback = false\ndefault_language = \"en\"\n",
+        "version = 1\ncodex_command = \"custom-codex\"\nallow_dummy_fallback = false\nworkspace_auto_commit = true\ndefault_language = \"en\"\n",
     )?;
     std::fs::create_dir_all(&workspace)?;
     std::fs::write(
@@ -227,6 +228,7 @@ fn config_layers_remain_separated() -> Result<()> {
     let config = Config::with_global_config_dir(workspace.clone(), global_dir)?;
     assert_eq!(config.codex_command, "custom-codex");
     assert!(!config.allow_dummy_fallback);
+    assert!(config.workspace_auto_commit);
     assert_eq!(config.novel_settings.title, "Book One");
     assert_eq!(config.novel_settings.genre, "Mystery");
     assert_eq!(config.global_settings.default_language, "en");

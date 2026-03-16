@@ -200,6 +200,7 @@ git commit -m "Initialize novel workspace"
 
 Git 확인용으로는 위 바깥 구조와 `novel.toml`을 커밋하고, `.novel/state/`, `.novel/logs/`, `.novel/memory/active_memory.md` 같은 런타임 데이터는 ignore하는 흐름을 권장한다.
 `init`은 루트 `README.md`, 각 주요 섹션 `README.md`, 그리고 `98_Templates/`의 starter template 파일도 함께 생성한다.
+Git을 잘 모르는 사용자라면 전역 설정 `workspace_auto_commit = true` 또는 `HEEFORGE_WORKSPACE_AUTO_COMMIT=true`로 workspace Git 자동 초기화/자동 커밋을 켤 수 있다. 이 경우 `init`, `next-scene`, `review`, `rewrite`, `approve`, `next-chapter`, `expand-world` 같은 변경 명령 뒤에 workspace repo가 자동으로 commit된다.
 
 워크스페이스 안에서 작업:
 
@@ -258,6 +259,7 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 - `HEEFORGE_CODEX_TIMEOUT_SECS`: 기본값 `120`
 - `HEEFORGE_ALLOW_DUMMY`: 기본값 `true`
 - `HEEFORGE_LOG_PROMPTS`: 기본값 `false`, `true`면 prompt/response 로그를 `.novel/logs/llm_prompts/`에 저장
+- `HEEFORGE_WORKSPACE_AUTO_COMMIT`: 기본값 `false`, `true`면 workspace Git repo를 자동 초기화하고 변경 명령마다 auto-commit
 - `HEEFORGE_INSTALL_DIR`: install script 기본값 `~/.local/bin`
 - `HEEFORGE_VERSION`: install script 기본값 `latest`
 - `HEEFORGE_REPO`: install script 기본값 `johwanghee/heeforge`

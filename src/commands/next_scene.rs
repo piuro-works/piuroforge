@@ -8,7 +8,7 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
     let log_path = engine.scene_generation_log_path(&scene.id);
     let scene_path = engine.scene_markdown_path(&scene.id);
 
-    Ok(CommandOutput::ok(
+    let output = CommandOutput::ok(
         "next-scene",
         engine.workspace_dir(),
         "Scene generated successfully.",
@@ -26,5 +26,11 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
         engine,
         &format!("show {}", scene.id),
     ))
-    .body(scene.text))
+    .body(scene.text);
+
+    Ok(super::finalize_workspace_change(
+        engine,
+        output,
+        &format!("heeforge: draft scene {}", scene.id),
+    ))
 }

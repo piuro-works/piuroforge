@@ -7,7 +7,7 @@ pub fn run(engine: &NovelEngine, scene_id: &str, instruction: &str) -> Result<Co
     let scene = engine.rewrite_scene(scene_id, instruction)?;
     let history_dir = engine.rewrite_history_dir(scene_id);
 
-    Ok(CommandOutput::ok(
+    let output = CommandOutput::ok(
         "rewrite",
         engine.workspace_dir(),
         "Scene rewritten successfully. Original and revised snapshots were preserved.",
@@ -23,5 +23,11 @@ pub fn run(engine: &NovelEngine, scene_id: &str, instruction: &str) -> Result<Co
         engine,
         &format!("show {}", scene.id),
     ))
-    .body(scene.text))
+    .body(scene.text);
+
+    Ok(super::finalize_workspace_change(
+        engine,
+        output,
+        &format!("heeforge: rewrite scene {}", scene.id),
+    ))
 }

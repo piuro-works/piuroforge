@@ -19,6 +19,7 @@ use crate::models::{
 use crate::state_manager::StateManager;
 use crate::utils::files::{ensure_dir, list_markdown_files, read_string, write_string};
 use crate::utils::markdown::{parse_scene, render_chapter, render_scene};
+use crate::workspace_git::{WorkspaceGit, WorkspaceGitOutcome};
 use crate::workspace_scaffold::{scaffold_files, SCAFFOLD_DIRS};
 
 #[derive(Debug, Clone)]
@@ -329,6 +330,18 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
 
     pub fn workspace_dir(&self) -> &std::path::Path {
         &self.config.workspace_dir
+    }
+
+    pub fn workspace_auto_commit_enabled(&self) -> bool {
+        self.config.workspace_auto_commit
+    }
+
+    pub fn auto_commit_workspace(&self, message: &str) -> WorkspaceGitOutcome {
+        WorkspaceGit::new(
+            self.config.workspace_dir.clone(),
+            self.config.workspace_auto_commit,
+        )
+        .auto_commit(message)
     }
 
     pub fn novel_dir(&self) -> &std::path::Path {

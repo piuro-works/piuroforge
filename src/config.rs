@@ -29,6 +29,7 @@ pub struct Config {
     pub novel_settings: NovelSettings,
     pub allow_dummy_fallback: bool,
     pub log_prompts: bool,
+    pub workspace_auto_commit: bool,
     pub codex_command: String,
     pub codex_timeout_secs: u64,
 }
@@ -85,6 +86,9 @@ impl Config {
             log_prompts: env_flag("HEEFORGE_LOG_PROMPTS")
                 .or_else(|| env_flag("NOVEL_ENGINE_LOG_PROMPTS"))
                 .unwrap_or(global_settings.log_prompts),
+            workspace_auto_commit: env_flag("HEEFORGE_WORKSPACE_AUTO_COMMIT")
+                .or_else(|| env_flag("NOVEL_ENGINE_WORKSPACE_AUTO_COMMIT"))
+                .unwrap_or(global_settings.workspace_auto_commit),
             codex_command: env::var("HEEFORGE_CODEX_CMD")
                 .or_else(|_| env::var("NOVEL_ENGINE_CODEX_CMD"))
                 .unwrap_or_else(|_| global_settings.codex_command.clone()),
@@ -130,6 +134,8 @@ pub struct GlobalSettings {
     pub allow_dummy_fallback: bool,
     #[serde(default = "default_log_prompts")]
     pub log_prompts: bool,
+    #[serde(default = "default_workspace_auto_commit")]
+    pub workspace_auto_commit: bool,
     #[serde(default = "default_default_language")]
     pub default_language: String,
     #[serde(default)]
@@ -144,6 +150,7 @@ impl Default for GlobalSettings {
             codex_timeout_secs: default_codex_timeout_secs(),
             allow_dummy_fallback: default_allow_dummy_fallback(),
             log_prompts: default_log_prompts(),
+            workspace_auto_commit: default_workspace_auto_commit(),
             default_language: default_default_language(),
             default_workspace_root: None,
         }
@@ -303,6 +310,10 @@ fn default_default_language() -> String {
 }
 
 fn default_log_prompts() -> bool {
+    false
+}
+
+fn default_workspace_auto_commit() -> bool {
     false
 }
 

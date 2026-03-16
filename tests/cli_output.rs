@@ -104,6 +104,79 @@ fn init_json_creates_ready_workspace_without_prompting() -> Result<()> {
 }
 
 #[test]
+fn workspace_auto_commit_initializes_repo_and_tracks_mutations() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("git-auto-novel");
+    let global_dir = temp_dir.path().join("config-home");
+
+    let init_output = Command::new(novel_bin())
+        .arg("--format")
+        .arg("json")
+        .arg("init")
+        .arg(&workspace)
+        .arg("--title")
+        .arg("Git Auto Novel")
+        .arg("--genre")
+        .arg("Mystery")
+        .arg("--tone")
+        .arg("Tense, atmospheric")
+        .arg("--premise")
+        .arg("A damaged investigator chases a missing sibling through a city built on edited memories.")
+        .arg("--protagonist")
+        .arg("Yunseo")
+        .arg("--language")
+        .arg("ko")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("HEEFORGE_WORKSPACE_AUTO_COMMIT", "true")
+        .output()?;
+
+    assert!(init_output.status.success());
+    assert!(workspace.join(".git").exists());
+
+    let init_stdout = String::from_utf8(init_output.stdout)?;
+    let init_payload: Value = serde_json::from_str(&init_stdout)?;
+    assert_eq!(
+        detail_value(&init_payload, "workspace_git"),
+        Some("initialized")
+    );
+    assert!(detail_value(&init_payload, "git_commit").is_some());
+    assert_eq!(
+        git_stdout(&workspace, ["log", "-1", "--pretty=%s"])?,
+        "heeforge: initialize workspace"
+    );
+
+    let next_scene_output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("next-scene")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .env("HEEFORGE_WORKSPACE_AUTO_COMMIT", "true")
+        .env(
+            "HEEFORGE_CODEX_CMD",
+            "codex-command-for-tests-that-does-not-exist",
+        )
+        .output()?;
+
+    assert!(next_scene_output.status.success());
+
+    let next_scene_stdout = String::from_utf8(next_scene_output.stdout)?;
+    let next_scene_payload: Value = serde_json::from_str(&next_scene_stdout)?;
+    assert!(detail_value(&next_scene_payload, "git_commit").is_some());
+    assert_eq!(
+        git_stdout(&workspace, ["rev-list", "--count", "HEAD"])?,
+        "2"
+    );
+    assert_eq!(
+        git_stdout(&workspace, ["log", "-1", "--pretty=%s"])?,
+        "heeforge: draft scene scene_001_001"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn status_json_auto_detects_workspace_from_nested_directory() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
@@ -779,4 +852,17 @@ fn write_scene(workspace: &Path, scene: Scene) -> Result<()> {
     std::fs::create_dir_all(path.parent().expect("scene parent"))?;
     std::fs::write(path, render_scene(&scene))?;
     Ok(())
+}
+
+fn git_stdout<const N: usize>(workspace: &Path, args: [&str; N]) -> Result<String> {
+    let output = Command::new("git")
+        .current_dir(workspace)
+        .args(args)
+        .output()?;
+    assert!(
+        output.status.success(),
+        "git command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(String::from_utf8(output.stdout)?.trim().to_string())
 }

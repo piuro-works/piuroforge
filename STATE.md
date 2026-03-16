@@ -24,6 +24,7 @@
 - `next-scene`은 `premise`, `protagonist_name` 등 필수 `novel.toml` 값이 비어 있으면 실패한다.
 - planner/writer/expand-world 프롬프트는 full memory 파일 대신 bounded prompt memory view를 사용해 `story_memory`와 `open_conflicts` 누적을 완화한다.
 - opt-in prompt logging이 추가되어, 켜면 `.novel/logs/llm_prompts/`에 agent label별 prompt/response JSON 로그를 남긴다.
+- opt-in workspace Git auto-commit이 추가되어, 켜면 workspace repo를 자동 초기화하고 변경 명령 뒤에 자동 commit을 남긴다.
 - planner/writer/editor/critic 프롬프트 템플릿이 `src/prompts/`로 분리됐다.
 - scene 생성 로그는 `.novel/logs/`에, review JSON과 rewrite snapshot은 `06_Review/`에 저장된다.
 - `next-chapter`는 scene 번호 연속성을 검증한다.
@@ -50,6 +51,7 @@
 - `cargo test`에서 생성 로그, review 저장, rewrite snapshot, chapter 순서 검증, codex retry가 확인됐다.
 - unit test가 oversized `story_memory`의 prompt compaction과 `open_conflicts` recent-window 축약을 검증한다.
 - codex runner test가 opt-in prompt logging 파일 생성과 로그 payload 저장을 검증한다.
+- 바이너리 테스트가 workspace Git auto-commit이 `init`과 `next-scene` 뒤에 실제 commit을 남기는지 검증한다.
 - `cargo test`에서 rewrite metadata가 workspace 상대경로를 저장하는지 확인됐다.
 - smoke test와 CLI test가 `scene_001_001-...` 형식의 slugged scene filename 생성을 검증한다.
 - planner dummy path와 scene markdown 저장 포맷이 `short_title` 필드를 포함하도록 갱신됐다.

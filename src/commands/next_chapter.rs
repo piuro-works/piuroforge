@@ -10,7 +10,7 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
         .chapter_short_title(chapter_number)?
         .unwrap_or_else(|| format!("Chapter {chapter_number:03}"));
 
-    Ok(CommandOutput::ok(
+    let output = CommandOutput::ok(
         "next-chapter",
         engine.workspace_dir(),
         "Chapter markdown generated successfully.",
@@ -19,7 +19,13 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
     .detail("short_title", chapter_short_title)
     .detail("chapter_markdown", path.display().to_string())
     .artifact("chapter_markdown", &path)
-    .next_step(super::workspace_command(engine, "status")))
+    .next_step(super::workspace_command(engine, "status"));
+
+    Ok(super::finalize_workspace_change(
+        engine,
+        output,
+        &format!("heeforge: compile chapter {chapter_number:03}"),
+    ))
 }
 
 fn extract_chapter_number(path: &std::path::Path) -> Option<u32> {

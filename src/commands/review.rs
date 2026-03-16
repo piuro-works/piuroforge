@@ -32,7 +32,11 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
                 engine,
                 &format!("show {scene_id}"),
             ));
-        return Ok(output);
+        return Ok(super::finalize_workspace_change(
+            engine,
+            output,
+            &format!("heeforge: review scene {scene_id}"),
+        ));
     }
 
     let body = issues
@@ -66,5 +70,9 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
         ))
         .body(body);
 
-    Ok(output)
+    Ok(super::finalize_workspace_change(
+        engine,
+        output,
+        &format!("heeforge: review scene {scene_id}"),
+    ))
 }
