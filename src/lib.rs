@@ -5,6 +5,7 @@ pub mod config;
 pub mod engine;
 pub mod memory_manager;
 pub mod models;
+pub mod novel_backend;
 pub mod output;
 pub mod prompts;
 pub mod state_manager;

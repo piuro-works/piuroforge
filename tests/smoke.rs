@@ -1,7 +1,12 @@
 use anyhow::Result;
 use heeforge::models::Scene;
+use heeforge::novel_backend::{
+    NovelBackend, ReviewRequest, ReviewResponse, RewriteRequest, RewriteResponse,
+    SceneGenerationRequest, SceneGenerationResponse, WorldExpansionRequest, WorldExpansionResponse,
+};
 use heeforge::utils::markdown::render_scene;
 use heeforge::{Config, NovelEngine};
+use std::sync::Arc;
 use tempfile::tempdir;
 
 #[test]
@@ -221,6 +226,36 @@ fn next_chapter_rejects_gapped_scene_sequence() -> Result<()> {
 }
 
 #[test]
+fn novel_engine_can_use_injected_backend() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("backend-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let mut config = Config::with_global_config_dir(workspace.clone(), global_dir)?;
+    config.novel_settings.genre = "Mystery".to_string();
+    config.novel_settings.tone = "Focused, cinematic, character-driven".to_string();
+    config.novel_settings.premise =
+        "A damaged investigator chases a missing sibling through a city built on edited memories."
+            .to_string();
+    config.novel_settings.protagonist_name = "Yunseo".to_string();
+
+    let engine = NovelEngine::with_backend(config, Arc::new(StubBackend))?;
+    engine.init_project()?;
+    let scene = engine.generate_next_scene()?.value;
+
+    assert_eq!(scene.id, "scene_001_001");
+    assert_eq!(scene.short_title, "Backend Separation");
+    assert!(scene.text.contains("Stub backend final scene."));
+
+    let saved = std::fs::read_to_string(scene_file_path(&workspace, "scene_001_001")?)?;
+    assert!(saved.contains("Stub backend final scene."));
+    let log =
+        std::fs::read_to_string(workspace.join(".novel/logs/scene_generation/scene_001_001.json"))?;
+    assert!(log.contains("\"planner_output\": \"stub-plan\""));
+
+    Ok(())
+}
+
+#[test]
 fn config_layers_remain_separated() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("book-one");
@@ -287,4 +322,61 @@ fn test_engine(
     config.global_settings.codex_command =
         "codex-command-for-tests-that-does-not-exist".to_string();
     NovelEngine::new(config)
+}
+
+struct StubBackend;
+
+impl NovelBackend for StubBackend {
+    fn generate_scene(&self, request: SceneGenerationRequest) -> Result<SceneGenerationResponse> {
+        Ok(SceneGenerationResponse {
+            final_scene: Scene {
+                id: request.scene_id,
+                chapter: request.chapter,
+                scene_number: request.scene_number,
+                short_title: "Backend Separation".to_string(),
+                goal: "Prove the control engine only persists and advances state.".to_string(),
+                conflict: "The Codex-facing generation path must stay behind the backend boundary."
+                    .to_string(),
+                outcome:
+                    "A canned scene is persisted without the control engine knowing how it was produced."
+                        .to_string(),
+                text: "Stub backend final scene.".to_string(),
+                status: "draft".to_string(),
+            },
+            planner_output: "stub-plan".to_string(),
+            planner_fallback_warning: None,
+            writer_output: "stub-writer".to_string(),
+            writer_fallback_warning: None,
+            editor_output: "stub-editor".to_string(),
+            editor_fallback_warning: None,
+            warnings: Vec::new(),
+        })
+    }
+
+    fn review_scene(&self, _request: ReviewRequest) -> Result<ReviewResponse> {
+        Ok(ReviewResponse {
+            issues: Vec::new(),
+            critic_fallback_warning: None,
+            warnings: Vec::new(),
+        })
+    }
+
+    fn rewrite_scene(&self, request: RewriteRequest) -> Result<RewriteResponse> {
+        Ok(RewriteResponse {
+            rewritten_scene: Scene {
+                text: format!("{}\n\nRewritten by stub backend.", request.scene.text),
+                status: "draft".to_string(),
+                ..request.scene
+            },
+            editor_fallback_warning: None,
+            warnings: Vec::new(),
+        })
+    }
+
+    fn expand_world(&self, _request: WorldExpansionRequest) -> Result<WorldExpansionResponse> {
+        Ok(WorldExpansionResponse {
+            expansion: "# World Expansion\n\n- Stub backend expansion.\n".to_string(),
+            warnings: Vec::new(),
+        })
+    }
 }

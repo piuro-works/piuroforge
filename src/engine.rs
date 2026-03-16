@@ -2,19 +2,19 @@ use anyhow::{anyhow, Context, Result};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::agents::base::{strip_code_fences, Agent, AgentContext};
-use crate::agents::critic::CriticAgent;
-use crate::agents::editor::EditorAgent;
-use crate::agents::planner::PlannerAgent;
-use crate::agents::writer::WriterAgent;
 use crate::codex_runner::CodexRunner;
 use crate::config::Config;
 use crate::memory_manager::MemoryManager;
 use crate::models::{
     derive_short_title, slug_fragment, MemoryBundle, OperationResult, ReviewIssue, ReviewReport,
-    RewriteRecord, Scene, SceneGenerationLog, ScenePlan, StoryState, WorkspaceManifest,
+    RewriteRecord, Scene, SceneGenerationLog, StoryState, WorkspaceManifest,
+};
+use crate::novel_backend::{
+    CodexNovelBackend, NovelBackend, ReviewRequest, RewriteRequest, SceneGenerationRequest,
+    WorldExpansionRequest,
 };
 use crate::state_manager::StateManager;
 use crate::utils::files::{ensure_dir, list_markdown_files, read_string, write_string};
@@ -22,18 +22,16 @@ use crate::utils::markdown::{parse_scene, render_chapter, render_scene};
 use crate::workspace_git::{WorkspaceGit, WorkspaceGitOutcome};
 use crate::workspace_scaffold::{scaffold_files, SCAFFOLD_DIRS};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct NovelEngine {
     config: Config,
     state_manager: StateManager,
     memory_manager: MemoryManager,
-    codex_runner: CodexRunner,
+    backend: Arc<dyn NovelBackend + Send + Sync>,
 }
 
 impl NovelEngine {
     pub fn new(config: Config) -> Result<Self> {
-        let state_manager = StateManager::new(config.state_path.clone());
-        let memory_manager = MemoryManager::new(config.memory_dir.clone());
         let mut codex_runner = CodexRunner::new(
             config.codex_command.clone(),
             Duration::from_secs(config.codex_timeout_secs),
@@ -42,11 +40,21 @@ impl NovelEngine {
             codex_runner = codex_runner.with_prompt_logging(config.logs_dir.join("llm_prompts"));
         }
 
+        Self::with_backend(config, Arc::new(CodexNovelBackend::new(codex_runner)))
+    }
+
+    pub fn with_backend(
+        config: Config,
+        backend: Arc<dyn NovelBackend + Send + Sync>,
+    ) -> Result<Self> {
+        let state_manager = StateManager::new(config.state_path.clone());
+        let memory_manager = MemoryManager::new(config.memory_dir.clone());
+
         Ok(Self {
             config,
             state_manager,
             memory_manager,
-            codex_runner,
+            backend,
         })
     }
 
@@ -83,86 +91,30 @@ impl NovelEngine {
         self.init_project()?;
         self.ensure_generation_ready()?;
 
-        let mut warnings = Vec::new();
         let mut state = self.state_manager.load_state()?;
         let memory = self.memory_manager.load_prompt_bundle()?;
         let (chapter, scene_number, scene_id) = self.state_manager.next_scene_identity(&state);
-
-        let planner = PlannerAgent::new(self.codex_runner.clone(), true);
-        let planner_context = AgentContext {
+        let generated = self.backend.generate_scene(SceneGenerationRequest {
             state: state.clone(),
             novel: self.config.novel_settings.clone(),
             memory: memory.clone(),
-            scene_plan: None,
-            scene: None,
-            instruction: None,
-            allow_dummy_fallback: self.config.allow_dummy_fallback,
-        };
-        let planner_run = planner.run(&planner_context)?;
-        if let Some(warning) = planner_run.fallback_warning.clone() {
-            warnings.push(warning);
-        }
-        let mut scene_plan = self.parse_scene_plan(&planner_run.output, chapter, scene_number);
-        scene_plan.chapter = chapter;
-        scene_plan.scene_number = scene_number;
-
-        let writer = WriterAgent::new(self.codex_runner.clone(), true);
-        let writer_context = AgentContext {
-            state: state.clone(),
-            novel: self.config.novel_settings.clone(),
-            memory: memory.clone(),
-            scene_plan: Some(scene_plan.clone()),
-            scene: None,
-            instruction: None,
-            allow_dummy_fallback: self.config.allow_dummy_fallback,
-        };
-        let writer_run = writer.run(&writer_context)?;
-        if let Some(warning) = writer_run.fallback_warning.clone() {
-            warnings.push(warning);
-        }
-
-        let draft_scene = Scene {
-            id: scene_id,
             chapter,
             scene_number,
-            short_title: scene_plan.effective_short_title(),
-            goal: scene_plan.goal.clone(),
-            conflict: scene_plan.conflict.clone(),
-            outcome: scene_plan.outcome.clone(),
-            text: writer_run.output.clone(),
-            status: "draft".to_string(),
-        };
-
-        let editor = EditorAgent::new(self.codex_runner.clone(), true);
-        let editor_context = AgentContext {
-            state: state.clone(),
-            novel: self.config.novel_settings.clone(),
-            memory: memory.clone(),
-            scene_plan: Some(scene_plan),
-            scene: Some(draft_scene.clone()),
-            instruction: None,
+            scene_id,
             allow_dummy_fallback: self.config.allow_dummy_fallback,
-        };
-        let editor_run = editor.run(&editor_context)?;
-        if let Some(warning) = editor_run.fallback_warning.clone() {
-            warnings.push(warning);
-        }
-
-        let final_scene = Scene {
-            text: editor_run.output.clone(),
-            ..draft_scene
-        };
+        })?;
+        let final_scene = generated.final_scene;
 
         self.save_scene(&final_scene)?;
         self.save_scene_generation_log(SceneGenerationLog {
             timestamp_unix_secs: unix_timestamp_secs(),
             scene_id: final_scene.id.clone(),
-            planner_output: planner_run.output,
-            planner_fallback_warning: planner_run.fallback_warning,
-            writer_output: writer_run.output,
-            writer_fallback_warning: writer_run.fallback_warning,
-            editor_output: editor_run.output,
-            editor_fallback_warning: editor_run.fallback_warning,
+            planner_output: generated.planner_output,
+            planner_fallback_warning: generated.planner_fallback_warning,
+            writer_output: generated.writer_output,
+            writer_fallback_warning: generated.writer_fallback_warning,
+            editor_output: generated.editor_output,
+            editor_fallback_warning: generated.editor_fallback_warning,
             final_scene: final_scene.clone(),
         })?;
         self.state_manager
@@ -176,7 +128,7 @@ impl NovelEngine {
 
         Ok(OperationResult {
             value: final_scene,
-            warnings,
+            warnings: generated.warnings,
         })
     }
 
@@ -190,25 +142,23 @@ impl NovelEngine {
             .ok_or_else(|| anyhow!("no current scene available to review"))?;
         let scene = self.show_scene(&scene_id)?;
         let memory = self.memory_manager.load_bundle()?;
-        let critic = CriticAgent::new(self.codex_runner.clone(), true);
-        let context = AgentContext {
+        let reviewed = self.backend.review_scene(ReviewRequest {
             state,
             novel: self.config.novel_settings.clone(),
             memory,
-            scene_plan: None,
-            scene: Some(scene.clone()),
-            instruction: None,
             allow_dummy_fallback: self.config.allow_dummy_fallback,
-        };
+            scene,
+        })?;
 
-        let run = critic.run(&context)?;
-        let issues = self.parse_review_issues(&run.output);
-        self.save_review_report(&scene.id, &issues, run.fallback_warning.clone())?;
-        let mut result = OperationResult::new(issues);
-        if let Some(warning) = run.fallback_warning {
-            result = result.warning(warning);
-        }
-        Ok(result)
+        self.save_review_report(
+            &scene_id,
+            &reviewed.issues,
+            reviewed.critic_fallback_warning,
+        )?;
+        Ok(OperationResult {
+            value: reviewed.issues,
+            warnings: reviewed.warnings,
+        })
     }
 
     pub fn rewrite_scene(
@@ -221,28 +171,19 @@ impl NovelEngine {
         let state = self.state_manager.load_state()?;
         let memory = self.memory_manager.load_bundle()?;
         let existing_scene = self.show_scene(scene_id)?;
-        let editor = EditorAgent::new(self.codex_runner.clone(), true);
-        let context = AgentContext {
+        let rewritten = self.backend.rewrite_scene(RewriteRequest {
             state: state.clone(),
             novel: self.config.novel_settings.clone(),
             memory,
-            scene_plan: None,
-            scene: Some(existing_scene.clone()),
-            instruction: Some(instruction.to_string()),
+            scene: existing_scene.clone(),
+            instruction: instruction.to_string(),
             allow_dummy_fallback: self.config.allow_dummy_fallback,
-        };
-
-        let run = editor.run(&context)?;
+        })?;
         let revision = self.next_rewrite_revision(scene_id)?;
         let original_snapshot_path = self.rewrite_snapshot_path(scene_id, revision, "original");
         let rewritten_snapshot_path = self.rewrite_snapshot_path(scene_id, revision, "rewritten");
         write_string(&original_snapshot_path, &render_scene(&existing_scene))?;
-
-        let rewritten_scene = Scene {
-            text: run.output.clone(),
-            status: "draft".to_string(),
-            ..existing_scene
-        };
+        let rewritten_scene = rewritten.rewritten_scene;
 
         self.save_scene(&rewritten_scene)?;
         write_string(&rewritten_snapshot_path, &render_scene(&rewritten_scene))?;
@@ -251,7 +192,7 @@ impl NovelEngine {
             scene_id: scene_id.to_string(),
             instruction: instruction.to_string(),
             revision,
-            editor_fallback_warning: run.fallback_warning.clone(),
+            editor_fallback_warning: rewritten.editor_fallback_warning,
             original_snapshot_path: self.workspace_relative_path(&original_snapshot_path),
             rewritten_snapshot_path: self.workspace_relative_path(&rewritten_snapshot_path),
         })?;
@@ -267,12 +208,10 @@ impl NovelEngine {
             instruction
         ))?;
 
-        let mut result = OperationResult::new(rewritten_scene);
-        if let Some(warning) = run.fallback_warning {
-            result = result.warning(warning);
-        }
-
-        Ok(result)
+        Ok(OperationResult {
+            value: rewritten_scene,
+            warnings: rewritten.warnings,
+        })
     }
 
     pub fn approve_scene(&self, scene_id: &str) -> Result<()> {
@@ -325,38 +264,20 @@ impl NovelEngine {
         self.init_project()?;
 
         let memory = self.memory_manager.load_prompt_bundle()?;
-        let prompt = format!(
-            "You are expanding the world bible for HeeForge, a CLI-first AI novel engine.\n\
-Return plain markdown only with one new section that deepens setting, factions, or rules.\n\n\
-Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
-            core = memory.core_memory,
-            story = memory.story_memory,
-            active = memory.active_memory,
-        );
+        let expanded = self.backend.expand_world(WorldExpansionRequest {
+            memory,
+            allow_dummy_fallback: self.config.allow_dummy_fallback,
+        })?;
 
-        let (expansion, fallback_warning) = match self.codex_runner.run_prompt_named(
-            "expand-world",
-            &prompt,
-        ) {
-            Ok(response) => (response, None),
-            Err(error) if !self.config.allow_dummy_fallback => return Err(error),
-            Err(error) => (
-                "# World Expansion\n\n- A hidden civic pact binds the city guilds to a forgotten disaster beneath the harbor.\n- Anyone who breaks the pact inherits both political leverage and mortal risk.\n".to_string(),
-                Some(format!(
-                    "expand-world used dummy fallback because codex failed: {}",
-                    compact_error_message(&error)
-                )),
-            ),
-        };
+        self.memory_manager.append_story_memory(&format!(
+            "## World Expansion\n{}\n",
+            expanded.expansion.trim()
+        ))?;
 
-        self.memory_manager
-            .append_story_memory(&format!("## World Expansion\n{}\n", expansion.trim()))?;
-
-        let mut result = OperationResult::new(expansion);
-        if let Some(warning) = fallback_warning {
-            result = result.warning(warning);
-        }
-        Ok(result)
+        Ok(OperationResult {
+            value: expanded.expansion,
+            warnings: expanded.warnings,
+        })
     }
 
     pub fn get_memory(&self) -> Result<MemoryBundle> {
@@ -728,52 +649,6 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
             .join(format!("rewrite_{revision:03}_{kind}.md"))
     }
 
-    fn parse_scene_plan(&self, raw: &str, chapter: u32, scene_number: u32) -> ScenePlan {
-        let cleaned = strip_code_fences(raw);
-        let mut plan = serde_json::from_str::<ScenePlan>(&cleaned).unwrap_or_else(|_| ScenePlan {
-            chapter,
-            scene_number,
-            short_title: "Decision at the Threshold".to_string(),
-            goal: "The protagonist pushes the story into a new decision point.".to_string(),
-            conflict: "An ally and a threat demand mutually exclusive choices.".to_string(),
-            outcome: "The protagonist gains momentum, but the cost becomes personal.".to_string(),
-        });
-
-        if plan.chapter == 0 {
-            plan.chapter = chapter;
-        }
-        if plan.scene_number == 0 {
-            plan.scene_number = scene_number;
-        }
-        if plan.goal.trim().is_empty() {
-            plan.goal = "The protagonist pushes the story into a new decision point.".to_string();
-        }
-        if plan.short_title.trim().is_empty() {
-            plan.short_title = plan.effective_short_title();
-        }
-        if plan.conflict.trim().is_empty() {
-            plan.conflict = "An ally and a threat demand mutually exclusive choices.".to_string();
-        }
-        if plan.outcome.trim().is_empty() {
-            plan.outcome =
-                "The protagonist gains momentum, but the cost becomes personal.".to_string();
-        }
-
-        plan
-    }
-
-    fn parse_review_issues(&self, raw: &str) -> Vec<ReviewIssue> {
-        let cleaned = strip_code_fences(raw);
-        serde_json::from_str::<Vec<ReviewIssue>>(&cleaned).unwrap_or_else(|_| {
-            vec![ReviewIssue {
-                issue_type: "analysis".to_string(),
-                description: cleaned,
-                line_start: None,
-                line_end: None,
-            }]
-        })
-    }
-
     fn render_active_memory(&self, state: &StoryState, scene: &Scene) -> String {
         format!(
             "# Active Memory\n\n- Arc: {}\n- Chapter: {}\n- Scene: {}\n- Scene ID: {}\n- Short Title: {}\n- Stage: {}\n- Goal: {}\n- Conflict: {}\n- Outcome: {}\n",
@@ -860,27 +735,4 @@ fn unix_timestamp_secs() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs())
         .unwrap_or(0)
-}
-
-fn compact_error_message(error: &anyhow::Error) -> String {
-    let flattened = error
-        .to_string()
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ");
-
-    truncate_chars(flattened.trim(), 220)
-}
-
-fn truncate_chars(value: &str, max_chars: usize) -> String {
-    let mut rendered = String::new();
-    for ch in value.chars().take(max_chars) {
-        rendered.push(ch);
-    }
-
-    if value.chars().count() <= max_chars {
-        rendered
-    } else {
-        format!("{}...", rendered.trim_end())
-    }
 }

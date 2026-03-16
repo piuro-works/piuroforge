@@ -213,6 +213,7 @@ git commit -m "Initialize novel workspace"
 Git 확인용으로는 위 바깥 구조와 `novel.toml`을 커밋하고, `.novel/state/`, `.novel/logs/`, `.novel/memory/active_memory.md` 같은 런타임 데이터는 ignore하는 흐름을 권장한다.
 `init`은 루트 `README.md`, 각 주요 섹션 `README.md`, 그리고 `98_Templates/`의 starter template 파일도 함께 생성한다.
 Git을 잘 모르는 사용자라면 전역 설정 `workspace_auto_commit = true` 또는 `HEEFORGE_WORKSPACE_AUTO_COMMIT=true`로 workspace Git 자동 초기화/자동 커밋을 켤 수 있다. 이 경우 `init`, `next-scene`, `review`, `rewrite`, `approve`, `next-chapter`, `expand-world` 같은 변경 명령 뒤에 workspace repo가 자동으로 commit된다.
+내부 구현은 workspace 제어 엔진과 Codex 소설 생성 backend를 분리했지만, 사용자는 계속 같은 `heeforge` 명령만 쓰면 된다. backend 분리는 사용자 절차를 늘리기 위한 것이 아니라, 향후 worker/bridge 구조를 숨긴 채 안정성을 높이기 위한 내부 경계다.
 
 워크스페이스 안에서 작업:
 
