@@ -11,6 +11,10 @@ Language: {{language}}
 Current stage: {{stage}}
 Current goal: {{current_goal}}
 Open conflicts: {{open_conflicts}}
+Use the story foundation below as the current canon. If it is thin, stay consistent with what exists and avoid inventing unnecessary lore.
+
+Story foundation:
+{{story_foundation}}
 
 Core memory:
 {{core_memory}}

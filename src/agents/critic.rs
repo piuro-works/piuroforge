@@ -33,6 +33,7 @@ impl CriticAgent {
                 ("goal", scene.goal.as_str()),
                 ("conflict", scene.conflict.as_str()),
                 ("outcome", scene.outcome.as_str()),
+                ("story_foundation", context.story_foundation.as_str()),
                 ("text", scene.text.as_str()),
             ],
         ))

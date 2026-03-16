@@ -9,6 +9,7 @@ pub mod novel_backend;
 pub mod output;
 pub mod prompts;
 pub mod state_manager;
+pub mod story_foundation;
 pub mod utils;
 mod workspace_git;
 mod workspace_scaffold;

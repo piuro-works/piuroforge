@@ -17,6 +17,9 @@ use crate::novel_backend::{
     WorldExpansionRequest,
 };
 use crate::state_manager::StateManager;
+use crate::story_foundation::{
+    load_story_foundation, StoryFoundationBundle, StoryFoundationStatus,
+};
 use crate::utils::files::{ensure_dir, list_markdown_files, read_string, write_string};
 use crate::utils::markdown::{parse_scene, render_chapter, render_scene};
 use crate::workspace_git::{WorkspaceGit, WorkspaceGitOutcome};
@@ -93,11 +96,13 @@ impl NovelEngine {
 
         let mut state = self.state_manager.load_state()?;
         let memory = self.memory_manager.load_prompt_bundle()?;
+        let foundation = self.load_story_foundation_bundle()?;
         let (chapter, scene_number, scene_id) = self.state_manager.next_scene_identity(&state);
         let generated = self.backend.generate_scene(SceneGenerationRequest {
             state: state.clone(),
             novel: self.config.novel_settings.clone(),
             memory: memory.clone(),
+            story_foundation: foundation.prompt_context.clone(),
             chapter,
             scene_number,
             scene_id,
@@ -126,9 +131,14 @@ impl NovelEngine {
         self.memory_manager
             .append_story_memory(&self.render_story_memory_entry(&final_scene))?;
 
+        let mut warnings = generated.warnings;
+        if let Some(warning) = story_foundation_warning(&foundation.status) {
+            warnings.push(warning);
+        }
+
         Ok(OperationResult {
             value: final_scene,
-            warnings: generated.warnings,
+            warnings,
         })
     }
 
@@ -142,10 +152,12 @@ impl NovelEngine {
             .ok_or_else(|| anyhow!("no current scene available to review"))?;
         let scene = self.show_scene(&scene_id)?;
         let memory = self.memory_manager.load_bundle()?;
+        let foundation = self.load_story_foundation_bundle()?;
         let reviewed = self.backend.review_scene(ReviewRequest {
             state,
             novel: self.config.novel_settings.clone(),
             memory,
+            story_foundation: foundation.prompt_context,
             allow_dummy_fallback: self.config.allow_dummy_fallback,
             scene,
         })?;
@@ -174,11 +186,13 @@ impl NovelEngine {
 
         let state = self.state_manager.load_state()?;
         let memory = self.memory_manager.load_bundle()?;
+        let foundation = self.load_story_foundation_bundle()?;
         let existing_scene = self.show_scene(scene_id)?;
         let rewritten = self.backend.rewrite_scene(RewriteRequest {
             state: state.clone(),
             novel: self.config.novel_settings.clone(),
             memory,
+            story_foundation: foundation.prompt_context,
             scene: existing_scene.clone(),
             instruction: instruction.to_string(),
             allow_dummy_fallback: self.config.allow_dummy_fallback,
@@ -268,8 +282,10 @@ impl NovelEngine {
         self.init_project()?;
 
         let memory = self.memory_manager.load_prompt_bundle()?;
+        let foundation = self.load_story_foundation_bundle()?;
         let expanded = self.backend.expand_world(WorldExpansionRequest {
             memory,
+            story_foundation: foundation.prompt_context,
             allow_dummy_fallback: self.config.allow_dummy_fallback,
         })?;
 
@@ -330,6 +346,10 @@ impl NovelEngine {
 
     pub fn workspace_readme_path(&self) -> &std::path::Path {
         &self.config.workspace_readme_path
+    }
+
+    pub fn story_foundation_status(&self) -> Result<StoryFoundationStatus> {
+        Ok(self.load_story_foundation_bundle()?.status)
     }
 
     pub fn novel_title(&self) -> &str {
@@ -734,6 +754,10 @@ impl NovelEngine {
             .display()
             .to_string()
     }
+
+    fn load_story_foundation_bundle(&self) -> Result<StoryFoundationBundle> {
+        load_story_foundation(&self.config.workspace_dir)
+    }
 }
 
 fn unix_timestamp_secs() -> u64 {
@@ -741,4 +765,25 @@ fn unix_timestamp_secs() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs())
         .unwrap_or(0)
+}
+
+fn story_foundation_warning(status: &StoryFoundationStatus) -> Option<String> {
+    if status.score >= 60 {
+        return None;
+    }
+
+    if status.missing_items.is_empty() {
+        return Some(format!(
+            "Story foundation is still {} ({}/100). Add more brief, bible, or plot documents before expecting stable novel output.",
+            status.level(),
+            status.score
+        ));
+    }
+
+    Some(format!(
+        "Story foundation is {} ({}/100). For better scenes, add {}.",
+        status.level(),
+        status.score,
+        status.missing_items.join(", ")
+    ))
 }

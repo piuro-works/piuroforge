@@ -70,14 +70,17 @@ curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh
 1. 터미널에서 한 번 `codex login` 실행
 2. `heeforge init <workspace>` 실행
 3. 워크스페이스에서 `heeforge doctor` 실행
-4. `doctor`가 `ready`를 보여주면 HeeForge 설정은 끝
-5. 필요하면 `~/.config/heeforge/config.toml` 열기
-6. 실제 집필은 `allow_dummy_fallback = false` 유지
-7. 폴더 흐름만 시험하고 싶을 때만 `allow_dummy_fallback = true` 사용
+4. 첫 장면 전에 `01_Brief`, `03_StoryBible/Plot`, `03_StoryBible/Characters` 또는 `03_StoryBible/World`에 최소 문서 하나씩 채우기
+5. `doctor`가 `ready`를 보여주면 HeeForge 설정은 끝
+6. 필요하면 `~/.config/heeforge/config.toml` 열기
+7. 실제 집필은 `allow_dummy_fallback = false` 유지
+8. 폴더 흐름만 시험하고 싶을 때만 `allow_dummy_fallback = true` 사용
 
 `codex_unavailable`가 나오면 대부분은 로그인 미완료 또는 인터넷/DNS/VPN/프록시 문제다. 이 경우 개발 지식보다도 먼저 `codex login`과 네트워크 상태를 확인하는 쪽이 맞다.
 
 중요한 구분도 있다. Codex 같은 에이전트, IDE agent, 샌드박스 실행기 안에서 `heeforge`를 대신 호출하면 그 호스트가 자체 보안 승인창을 띄울 수 있다. 그 승인창은 HeeForge의 추가 설정 단계가 아니라, 그 호스트 환경의 정책이다. 사용자 본인 터미널에서 직접 `heeforge`를 실행할 때는 HeeForge가 별도의 승인 UX를 요구하지 않는다.
+
+`status`와 `next-scene`은 이제 workspace의 브리프/바이블/플롯 문서를 읽어 준비도를 계산한다. 준비도가 낮으면 경고를 보여주고, planner/writer/editor/critic도 그 문서들을 실제 프롬프트에 사용한다.
 
 ## 빌드
 

@@ -9,6 +9,10 @@ Instruction: {{instruction}}
 Goal: {{goal}}
 Conflict: {{conflict}}
 Outcome: {{outcome}}
+Keep continuity with the story foundation below.
+
+Story foundation:
+{{story_foundation}}
 
 Scene text:
 {{text}}

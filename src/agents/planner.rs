@@ -41,6 +41,7 @@ impl PlannerAgent {
                 ("stage", context.state.stage.as_str()),
                 ("current_goal", current_goal.as_str()),
                 ("open_conflicts", open_conflicts.as_str()),
+                ("story_foundation", context.story_foundation.as_str()),
                 ("core_memory", context.memory.core_memory.as_str()),
                 ("story_memory", context.memory.story_memory.as_str()),
                 ("active_memory", context.memory.active_memory.as_str()),

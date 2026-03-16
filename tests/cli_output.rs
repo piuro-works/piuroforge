@@ -54,6 +54,8 @@ fn status_json_output_is_structured() -> Result<()> {
         .as_str()
         .unwrap_or_default()
         .contains("Workspace"));
+    assert!(detail_value(&payload, "foundation_score").is_some());
+    assert!(detail_value(&payload, "foundation_level").is_some());
     assert!(payload["details"].is_array());
     assert!(payload["next_steps"].is_array());
 
@@ -143,7 +145,7 @@ fn init_json_creates_ready_workspace_without_prompting() -> Result<()> {
     assert_eq!(detail_value(&payload, "title"), Some("Fresh Novel"));
     assert_eq!(
         detail_value(&payload, "writer_setup"),
-        Some("Run `codex login` once, then run `heeforge doctor`.")
+        Some("Run `codex login` once, then run `heeforge doctor`. Before the first serious scene, fill a brief, a plot note, and a character or world note.")
     );
     assert_eq!(
         detail_value(&payload, "setup_done_when"),

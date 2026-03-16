@@ -42,6 +42,7 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
     assert!(workspace_readme.contains("This workspace separates human-facing manuscript files"));
     assert!(workspace_readme.contains("First Run Checklist"));
     assert!(workspace_readme.contains("heeforge doctor"));
+    assert!(workspace_readme.contains("project brief"));
     assert!(workspace_readme.contains("If Doctor says ready"));
     assert!(workspace_readme.contains("allow_dummy_fallback = false"));
     assert!(workspace_readme.contains("approval prompts"));

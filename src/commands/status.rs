@@ -6,9 +6,14 @@ use crate::output::CommandOutput;
 pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
     let state = engine.get_status()?;
     let missing = engine.missing_required_novel_fields();
+    let foundation = engine.story_foundation_status()?;
 
     let summary = if !missing.is_empty() {
         "Workspace scaffold exists, but novel config is still incomplete."
+    } else if foundation.score < 40 {
+        "Workspace is technically ready, but the story foundation is still skeletal."
+    } else if foundation.score < 60 {
+        "Workspace is ready, but the story foundation is still thin."
     } else if state.current_scene_id.is_none() {
         "Workspace is ready for the first scene."
     } else if state.stage == "scene_approved" {
@@ -31,6 +36,15 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
             "open_conflict_count",
             state.open_conflicts.len().to_string(),
         )
+        .detail("foundation_score", foundation.score.to_string())
+        .detail("foundation_level", foundation.level())
+        .detail("brief_doc_count", foundation.brief_docs.to_string())
+        .detail(
+            "story_bible_doc_count",
+            (foundation.character_docs + foundation.world_docs).to_string(),
+        )
+        .detail("plot_doc_count", foundation.plot_docs.to_string())
+        .detail("research_doc_count", foundation.research_docs.to_string())
         .artifact("workspace_config", engine.workspace_config_path());
 
     if !state.open_conflicts.is_empty() {
@@ -45,6 +59,23 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
             ))
             .next_step(super::workspace_command(engine, "doctor"))
             .next_step(format!("Edit {}", engine.workspace_config_path().display()));
+    } else if foundation.score < 60 {
+        for missing_item in &foundation.missing_items {
+            output = output.warning(format!(
+                "Story foundation is {} ({}/100): missing {}.",
+                foundation.level(),
+                foundation.score,
+                missing_item
+            ));
+        }
+
+        output = output
+            .next_step(format!(
+                "Add or expand docs in {}/01_Brief and {}/03_StoryBible before the next serious draft",
+                engine.workspace_dir().display(),
+                engine.workspace_dir().display()
+            ))
+            .next_step(super::workspace_command(engine, "next-scene"));
     } else if let Some(scene_id) = state.current_scene_id.as_deref() {
         output = output
             .next_step(super::workspace_command(

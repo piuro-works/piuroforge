@@ -14,6 +14,10 @@ Protagonist: {{protagonist_name}}
 Goal: {{goal}}
 Conflict: {{conflict}}
 Outcome: {{outcome}}
+Review against the story foundation below and call out continuity gaps when needed.
+
+Story foundation:
+{{story_foundation}}
 
 Scene text:
 {{text}}

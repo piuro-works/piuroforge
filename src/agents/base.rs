@@ -8,6 +8,7 @@ pub struct AgentContext {
     pub state: StoryState,
     pub novel: NovelSettings,
     pub memory: MemoryBundle,
+    pub story_foundation: String,
     pub scene_plan: Option<ScenePlan>,
     pub scene: Option<Scene>,
     pub instruction: Option<String>,

@@ -24,6 +24,7 @@ pub struct SceneGenerationRequest {
     pub state: StoryState,
     pub novel: NovelSettings,
     pub memory: MemoryBundle,
+    pub story_foundation: String,
     pub chapter: u32,
     pub scene_number: u32,
     pub scene_id: String,
@@ -47,6 +48,7 @@ pub struct ReviewRequest {
     pub state: StoryState,
     pub novel: NovelSettings,
     pub memory: MemoryBundle,
+    pub story_foundation: String,
     pub scene: Scene,
     pub allow_dummy_fallback: bool,
 }
@@ -64,6 +66,7 @@ pub struct RewriteRequest {
     pub state: StoryState,
     pub novel: NovelSettings,
     pub memory: MemoryBundle,
+    pub story_foundation: String,
     pub scene: Scene,
     pub instruction: String,
     pub allow_dummy_fallback: bool,
@@ -79,6 +82,7 @@ pub struct RewriteResponse {
 #[derive(Debug, Clone)]
 pub struct WorldExpansionRequest {
     pub memory: MemoryBundle,
+    pub story_foundation: String,
     pub allow_dummy_fallback: bool,
 }
 
@@ -108,6 +112,7 @@ impl NovelBackend for CodexNovelBackend {
             state: request.state.clone(),
             novel: request.novel.clone(),
             memory: request.memory.clone(),
+            story_foundation: request.story_foundation.clone(),
             scene_plan: None,
             scene: None,
             instruction: None,
@@ -127,6 +132,7 @@ impl NovelBackend for CodexNovelBackend {
             state: request.state.clone(),
             novel: request.novel.clone(),
             memory: request.memory.clone(),
+            story_foundation: request.story_foundation.clone(),
             scene_plan: Some(scene_plan.clone()),
             scene: None,
             instruction: None,
@@ -154,6 +160,7 @@ impl NovelBackend for CodexNovelBackend {
             state: request.state,
             novel: request.novel,
             memory: request.memory,
+            story_foundation: request.story_foundation,
             scene_plan: Some(scene_plan),
             scene: Some(draft_scene.clone()),
             instruction: None,
@@ -187,6 +194,7 @@ impl NovelBackend for CodexNovelBackend {
             state: request.state,
             novel: request.novel,
             memory: request.memory,
+            story_foundation: request.story_foundation,
             scene_plan: None,
             scene: Some(request.scene),
             instruction: None,
@@ -215,6 +223,7 @@ impl NovelBackend for CodexNovelBackend {
             state: request.state,
             novel: request.novel,
             memory: request.memory,
+            story_foundation: request.story_foundation,
             scene_plan: None,
             scene: Some(request.scene.clone()),
             instruction: Some(request.instruction),
@@ -242,7 +251,9 @@ impl NovelBackend for CodexNovelBackend {
         let prompt = format!(
             "You are expanding the world bible for HeeForge, a CLI-first AI novel engine.\n\
 Return plain markdown only with one new section that deepens setting, factions, or rules.\n\n\
+Story foundation:\n{foundation}\n\n\
 Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
+            foundation = request.story_foundation,
             core = request.memory.core_memory,
             story = request.memory.story_memory,
             active = request.memory.active_memory,

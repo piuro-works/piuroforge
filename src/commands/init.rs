@@ -137,7 +137,7 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
         )
         .detail(
             "writer_setup",
-            "Run `codex login` once, then run `heeforge doctor`.",
+            "Run `codex login` once, then run `heeforge doctor`. Before the first serious scene, fill a brief, a plot note, and a character or world note.",
         )
         .detail(
             "setup_done_when",
