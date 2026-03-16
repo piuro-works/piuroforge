@@ -1,4 +1,5 @@
 pub mod approve;
+pub mod capabilities;
 pub mod doctor;
 pub mod expand_world;
 pub mod init;

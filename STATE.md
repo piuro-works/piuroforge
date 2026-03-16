@@ -22,6 +22,9 @@
 - `heeforge init`은 필수 메타를 인터랙티브하게 수집할 수 있다.
 - CLI 전역 옵션 `--format text|json`이 추가됐다.
 - command 출력은 사람용 text와 에이전트용 JSON 계약으로 통일됐다.
+- 모든 JSON 출력은 이제 `schema_version = 1`과 `agent_mode`를 포함한다.
+- `capabilities` 명령이 추가되어, OpenClaw 같은 에이전트가 명령 목록과 부작용/Codex 의존성을 JSON으로 조회할 수 있다.
+- 전역 `--agent` 플래그가 추가되어, text 모드에서도 compact key-value 출력을 요청할 수 있다.
 - `--help`가 quickstart, 자동화 예시, subcommand 예시를 포함하도록 보강됐다.
 - 저장소 루트 `install.sh`가 GitHub Release 자산 설치를 지원한다.
 - `scripts/package-release.sh`가 target별 `heeforge-<target>.tar.gz`와 `.sha256`를 생성한다.

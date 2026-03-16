@@ -1,7 +1,10 @@
 use anyhow::Result;
 use clap::ValueEnum;
 use serde::Serialize;
+use serde_json::Value;
 use std::path::Path;
+
+pub const OUTPUT_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum OutputFormat {
@@ -41,13 +44,18 @@ impl Artifact {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CommandOutput {
+    pub schema_version: u32,
     pub status: &'static str,
+    pub agent_mode: bool,
     pub command: String,
     pub workspace: String,
     pub summary: String,
     pub details: Vec<OutputField>,
     pub artifacts: Vec<Artifact>,
     pub next_steps: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub body: Option<String>,
     pub warnings: Vec<String>,
 }
@@ -59,13 +67,16 @@ impl CommandOutput {
         summary: impl Into<String>,
     ) -> Self {
         Self {
+            schema_version: OUTPUT_SCHEMA_VERSION,
             status: "ok",
+            agent_mode: false,
             command: command.into(),
             workspace: workspace.as_ref().display().to_string(),
             summary: summary.into(),
             details: Vec::new(),
             artifacts: Vec::new(),
             next_steps: Vec::new(),
+            data: None,
             body: None,
             warnings: Vec::new(),
         }
@@ -96,7 +107,21 @@ impl CommandOutput {
         self
     }
 
+    pub fn data(mut self, data: impl Into<Value>) -> Self {
+        self.data = Some(data.into());
+        self
+    }
+
+    pub fn for_agent(mut self) -> Self {
+        self.agent_mode = true;
+        self
+    }
+
     pub fn render_text(&self) -> String {
+        if self.agent_mode {
+            return self.render_agent_text();
+        }
+
         let mut lines = vec![self.summary.clone()];
         lines.push(format!("Command: {}", self.command));
         lines.push(format!("Workspace: {}", self.workspace));
@@ -141,11 +166,60 @@ impl CommandOutput {
 
         lines.join("\n")
     }
+
+    fn render_agent_text(&self) -> String {
+        let mut lines = vec![
+            format!("status={}", self.status),
+            format!("schema_version={}", self.schema_version),
+            format!("agent_mode={}", self.agent_mode),
+            format!("command={}", self.command),
+            format!("workspace={}", self.workspace),
+            format!("summary={}", self.summary),
+        ];
+
+        for detail in &self.details {
+            lines.push(format!(
+                "detail.{}={}",
+                sanitize_key(&detail.label),
+                detail.value
+            ));
+        }
+
+        for artifact in &self.artifacts {
+            lines.push(format!(
+                "artifact.{}={}",
+                sanitize_key(&artifact.kind),
+                artifact.path
+            ));
+        }
+
+        for next in &self.next_steps {
+            lines.push(format!("next_step={next}"));
+        }
+
+        for warning in &self.warnings {
+            lines.push(format!("warning={warning}"));
+        }
+
+        if let Some(data) = &self.data {
+            lines.push(format!("data={}", data));
+        }
+
+        if let Some(body) = &self.body {
+            lines.push("body<<EOF".to_string());
+            lines.push(body.trim_end().to_string());
+            lines.push("EOF".to_string());
+        }
+
+        lines.join("\n")
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ErrorOutput {
+    pub schema_version: u32,
     pub status: &'static str,
+    pub agent_mode: bool,
     pub command: String,
     pub workspace: Option<String>,
     pub error_code: String,
@@ -169,7 +243,9 @@ impl ErrorOutput {
                 ));
             }
             return Self {
+                schema_version: OUTPUT_SCHEMA_VERSION,
                 status: "error",
+                agent_mode: false,
                 command: command.to_string(),
                 workspace: workspace_display.clone(),
                 error_code: "missing_novel_config".to_string(),
@@ -216,7 +292,9 @@ impl ErrorOutput {
             remediation.push(example_for("doctor", workspace));
             remediation.push(example_for(command, workspace));
             return Self {
+                schema_version: OUTPUT_SCHEMA_VERSION,
                 status: "error",
+                agent_mode: false,
                 command: command.to_string(),
                 workspace: workspace_display,
                 error_code: "codex_unavailable".to_string(),
@@ -229,7 +307,9 @@ impl ErrorOutput {
 
         if reason.contains("no current scene available to review") {
             return Self {
+                schema_version: OUTPUT_SCHEMA_VERSION,
                 status: "error",
+                agent_mode: false,
                 command: command.to_string(),
                 workspace: workspace_display,
                 error_code: "no_current_scene".to_string(),
@@ -249,7 +329,9 @@ impl ErrorOutput {
 
         if reason.contains("scene order is invalid") {
             return Self {
+                schema_version: OUTPUT_SCHEMA_VERSION,
                 status: "error",
+                agent_mode: false,
                 command: command.to_string(),
                 workspace: workspace_display,
                 error_code: "invalid_scene_sequence".to_string(),
@@ -265,7 +347,9 @@ impl ErrorOutput {
 
         if reason.contains("chapter scene limit reached") {
             return Self {
+                schema_version: OUTPUT_SCHEMA_VERSION,
                 status: "error",
+                agent_mode: false,
                 command: command.to_string(),
                 workspace: workspace_display,
                 error_code: "chapter_scene_limit_reached".to_string(),
@@ -281,7 +365,9 @@ impl ErrorOutput {
 
         if reason.contains("chapter scene target not reached") {
             return Self {
+                schema_version: OUTPUT_SCHEMA_VERSION,
                 status: "error",
+                agent_mode: false,
                 command: command.to_string(),
                 workspace: workspace_display,
                 error_code: "chapter_incomplete".to_string(),
@@ -299,7 +385,9 @@ impl ErrorOutput {
 
         if reason.contains("no scenes found for chapter") {
             return Self {
+                schema_version: OUTPUT_SCHEMA_VERSION,
                 status: "error",
+                agent_mode: false,
                 command: command.to_string(),
                 workspace: workspace_display,
                 error_code: "empty_chapter".to_string(),
@@ -314,7 +402,9 @@ impl ErrorOutput {
         }
 
         Self {
+            schema_version: OUTPUT_SCHEMA_VERSION,
             status: "error",
+            agent_mode: false,
             command: command.to_string(),
             workspace: workspace_display,
             error_code: "command_failed".to_string(),
@@ -328,7 +418,16 @@ impl ErrorOutput {
         }
     }
 
+    pub fn for_agent(mut self) -> Self {
+        self.agent_mode = true;
+        self
+    }
+
     pub fn render_text(&self) -> String {
+        if self.agent_mode {
+            return self.render_agent_text();
+        }
+
         let mut lines = vec!["Command failed.".to_string()];
         lines.push(format!("Command: {}", self.command));
         if let Some(workspace) = &self.workspace {
@@ -359,6 +458,34 @@ impl ErrorOutput {
             lines.push(example.clone());
         }
 
+        lines.join("\n")
+    }
+
+    fn render_agent_text(&self) -> String {
+        let mut lines = vec![
+            format!("status={}", self.status),
+            format!("schema_version={}", self.schema_version),
+            format!("agent_mode={}", self.agent_mode),
+            format!("command={}", self.command),
+            format!("error_code={}", self.error_code),
+            format!("reason={}", self.reason),
+        ];
+        if let Some(workspace) = &self.workspace {
+            lines.push(format!("workspace={workspace}"));
+        }
+        for detail in &self.details {
+            lines.push(format!(
+                "detail.{}={}",
+                sanitize_key(&detail.label),
+                detail.value
+            ));
+        }
+        for item in &self.remediation {
+            lines.push(format!("remediation={item}"));
+        }
+        if let Some(example) = &self.example_command {
+            lines.push(format!("example_command={example}"));
+        }
         lines.join("\n")
     }
 }
@@ -412,4 +539,17 @@ fn looks_like_network_error(reason: &str) -> bool {
         || normalized.contains("connection reset")
         || normalized.contains("connection refused")
         || normalized.contains("timed out")
+}
+
+fn sanitize_key(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }

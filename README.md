@@ -9,6 +9,11 @@ HeeForge CLI UX는 두 가지 출력 모드를 제공한다.
 - 기본 `text`: 사람이 읽기 쉬운 요약, 경로, 다음 추천 명령 출력
 - `--format json`: Codex CLI, OpenClaw, 기타 LLM 에이전트가 안정적으로 해석할 수 있는 구조화 출력
 
+`--agent` 플래그도 지원한다.
+
+- `text + --agent`: compact key-value 출력
+- `json + --agent`: 응답에 `schema_version`, `agent_mode`, 필요 시 command별 `data` payload 포함
+
 실제 소설 데이터는 엔진 소스 디렉터리가 아니라 별도 워크스페이스에 저장된다. 워크스페이스 루트에는 사람용 작업 폴더가 펼쳐지고, 숨김 디렉터리 `.novel/`에는 상태/로그/메모리 같은 엔진 런타임 데이터가 저장된다.
 운영 원칙은 `1 workspace = 1 novel`이다. 엔진 프로젝트 Git과 소설 작업 Git은 분리한다.
 
@@ -257,6 +262,16 @@ LLM/자동화 연동 시에는 `--format json`을 권장한다.
 heeforge --workspace ~/novels/my-first-novel --format json status
 heeforge --workspace ~/novels/my-first-novel --format json next-scene
 ```
+
+에이전트가 처음 붙을 때는 이 순서를 권장한다.
+
+```bash
+heeforge --format json --agent capabilities
+heeforge --workspace ~/novels/my-first-novel --format json --agent doctor
+heeforge --workspace ~/novels/my-first-novel --format json --agent status
+```
+
+`capabilities`는 각 명령의 workspace 필요 여부, Codex 필요 여부, workspace 변경 여부를 JSON으로 알려준다.
 
 `--format json`에서 `init`을 실행하면 interactive prompt를 기다리지 않도록 자동으로 non-interactive 모드로 동작한다. 필요한 필드는 flag 또는 `novel.toml` 편집으로 채운다.
 

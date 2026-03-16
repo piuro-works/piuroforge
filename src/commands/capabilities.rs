@@ -1,0 +1,163 @@
+use anyhow::Result;
+use serde::Serialize;
+use serde_json::json;
+use std::path::Path;
+
+use crate::output::{CommandOutput, OUTPUT_SCHEMA_VERSION};
+
+#[derive(Debug, Clone, Serialize)]
+struct CommandCapability {
+    name: &'static str,
+    workspace_required: bool,
+    mutates_workspace: bool,
+    requires_codex: bool,
+    supports_json: bool,
+    supports_agent_mode: bool,
+    args: Vec<&'static str>,
+}
+
+pub fn run(workspace: &Path) -> Result<CommandOutput> {
+    let commands = vec![
+        CommandCapability {
+            name: "capabilities",
+            workspace_required: false,
+            mutates_workspace: false,
+            requires_codex: false,
+            supports_json: true,
+            supports_agent_mode: true,
+            args: vec![],
+        },
+        CommandCapability {
+            name: "init",
+            workspace_required: false,
+            mutates_workspace: true,
+            requires_codex: false,
+            supports_json: true,
+            supports_agent_mode: true,
+            args: vec!["[PATH]"],
+        },
+        CommandCapability {
+            name: "status",
+            workspace_required: false,
+            mutates_workspace: false,
+            requires_codex: false,
+            supports_json: true,
+            supports_agent_mode: true,
+            args: vec![],
+        },
+        CommandCapability {
+            name: "doctor",
+            workspace_required: false,
+            mutates_workspace: false,
+            requires_codex: false,
+            supports_json: true,
+            supports_agent_mode: true,
+            args: vec![],
+        },
+        CommandCapability {
+            name: "next-scene",
+            workspace_required: true,
+            mutates_workspace: true,
+            requires_codex: true,
+            supports_json: true,
+            supports_agent_mode: true,
+            args: vec![],
+        },
+        CommandCapability {
+            name: "review",
+            workspace_required: true,
+            mutates_workspace: true,
+            requires_codex: true,
+            supports_json: true,
+            supports_agent_mode: true,
+            args: vec![],
+        },
+        CommandCapability {
+            name: "rewrite",
+            workspace_required: true,
+            mutates_workspace: true,
+            requires_codex: true,
+            supports_json: true,
+            supports_agent_mode: true,
+            args: vec!["SCENE_ID", "--instruction TEXT"],
+        },
+        CommandCapability {
+            name: "approve",
+            workspace_required: true,
+            mutates_workspace: true,
+            requires_codex: false,
+            supports_json: true,
+            supports_agent_mode: true,
+            args: vec!["SCENE_ID"],
+        },
+        CommandCapability {
+            name: "next-chapter",
+            workspace_required: true,
+            mutates_workspace: true,
+            requires_codex: false,
+            supports_json: true,
+            supports_agent_mode: true,
+            args: vec![],
+        },
+        CommandCapability {
+            name: "expand-world",
+            workspace_required: true,
+            mutates_workspace: true,
+            requires_codex: true,
+            supports_json: true,
+            supports_agent_mode: true,
+            args: vec![],
+        },
+        CommandCapability {
+            name: "memory",
+            workspace_required: true,
+            mutates_workspace: false,
+            requires_codex: false,
+            supports_json: true,
+            supports_agent_mode: true,
+            args: vec![],
+        },
+        CommandCapability {
+            name: "show",
+            workspace_required: true,
+            mutates_workspace: false,
+            requires_codex: false,
+            supports_json: true,
+            supports_agent_mode: true,
+            args: vec!["SCENE_ID"],
+        },
+    ];
+
+    let data = json!({
+        "recommended_invocation": "heeforge --format json --agent <command>",
+        "schema_version": OUTPUT_SCHEMA_VERSION,
+        "success_fields": ["schema_version", "status", "agent_mode", "command", "workspace", "summary", "details", "artifacts", "next_steps", "warnings"],
+        "error_fields": ["schema_version", "status", "agent_mode", "command", "workspace", "error_code", "reason", "remediation", "details"],
+        "commands": commands,
+        "notes": [
+            "Use --format json for stable machine-readable output.",
+            "Use --agent to request compact text output and explicit agent_mode markers.",
+            "Commands that mutate the workspace may auto-commit if workspace_auto_commit is enabled.",
+            "Commands that require Codex will fail with codex_unavailable unless Codex is installed, logged in, and reachable."
+        ]
+    });
+
+    let body = "\
+Recommended agent invocation:
+heeforge --workspace <workspace> --format json --agent status
+heeforge --workspace <workspace> --format json --agent next-scene
+
+Prefer `capabilities`, then `doctor`, then `status` before mutating commands.";
+
+    Ok(CommandOutput::ok(
+        "capabilities",
+        workspace,
+        "HeeForge agent contract and command capabilities.",
+    )
+    .detail("recommended_format", "json")
+    .detail("recommended_flag", "--agent")
+    .detail("schema_version", OUTPUT_SCHEMA_VERSION.to_string())
+    .detail("command_count", commands.len().to_string())
+    .body(body)
+    .data(data))
+}

@@ -16,6 +16,7 @@ Quickstart:
   heeforge review
 
 Automation:
+  heeforge --format json --agent capabilities
   heeforge --workspace ~/novels/my-book --format json status
   heeforge --workspace ~/novels/my-book --format json next-scene
 ";
@@ -37,6 +38,12 @@ const DOCTOR_AFTER_HELP: &str = "\
 Examples:
   heeforge doctor
   heeforge --workspace ~/novels/my-book --format json doctor
+";
+
+const CAPABILITIES_AFTER_HELP: &str = "\
+Examples:
+  heeforge capabilities
+  heeforge --format json --agent capabilities
 ";
 
 const NEXT_SCENE_AFTER_HELP: &str = "\
@@ -110,6 +117,13 @@ struct Cli {
         help = "Output mode. Use `json` for Codex CLI, OpenClaw, or other LLM agents."
     )]
     format: OutputFormat,
+    #[arg(
+        long,
+        global = true,
+        default_value_t = false,
+        help = "Agent-friendly mode. In text mode this emits compact key-value output, and in JSON mode it marks the response as agent_mode=true."
+    )]
+    agent: bool,
     #[command(subcommand)]
     command: NovelCommand,
 }
@@ -132,6 +146,11 @@ enum NovelCommand {
         after_long_help = DOCTOR_AFTER_HELP
     )]
     Doctor,
+    #[command(
+        about = "Describe the stable command contract for LLM agents.",
+        after_long_help = CAPABILITIES_AFTER_HELP
+    )]
+    Capabilities,
     #[command(
         about = "Generate the next scene by running planner, writer, and editor.",
         after_long_help = NEXT_SCENE_AFTER_HELP
@@ -184,6 +203,7 @@ impl NovelCommand {
             Self::Init(_) => "init",
             Self::Status => "status",
             Self::Doctor => "doctor",
+            Self::Capabilities => "capabilities",
             Self::NextScene => "next-scene",
             Self::Review => "review",
             Self::Rewrite { .. } => "rewrite",
@@ -199,6 +219,7 @@ impl NovelCommand {
 fn main() {
     let cli = Cli::parse();
     let format = cli.format;
+    let agent_mode = cli.agent;
     let command_name = cli.command.name().to_string();
     let workspace_hint = resolve_workspace_path(&cli).ok();
 
@@ -210,7 +231,11 @@ fn main() {
             }
         }
         Err(error) => {
-            let payload = ErrorOutput::from_error(&command_name, workspace_hint.as_deref(), &error);
+            let mut payload =
+                ErrorOutput::from_error(&command_name, workspace_hint.as_deref(), &error);
+            if agent_mode {
+                payload = payload.for_agent();
+            }
             if let Err(render_error) = emit_error(&payload, format) {
                 eprintln!("failed to render error output: {render_error}");
                 eprintln!("{}", payload.render_text());
@@ -223,7 +248,7 @@ fn main() {
 fn run(cli: Cli) -> Result<CommandOutput> {
     let workspace = resolve_workspace_path(&cli)?;
 
-    match cli.command {
+    let mut output = match cli.command {
         NovelCommand::Init(command) => {
             let mut config = Config::new(workspace)?;
             commands::init::prepare_config(&mut config, &command, cli.format)?;
@@ -238,6 +263,7 @@ fn run(cli: Cli) -> Result<CommandOutput> {
             let config = Config::new(workspace)?;
             commands::doctor::run(&config)
         }
+        NovelCommand::Capabilities => commands::capabilities::run(&workspace),
         NovelCommand::NextScene => {
             let engine = NovelEngine::new(Config::new(workspace)?)?;
             commands::next_scene::run(&engine)
@@ -273,7 +299,13 @@ fn run(cli: Cli) -> Result<CommandOutput> {
             let engine = NovelEngine::new(Config::new(workspace)?)?;
             commands::show::run(&engine, &scene_id)
         }
+    }?;
+
+    if cli.agent {
+        output = output.for_agent();
     }
+
+    Ok(output)
 }
 
 fn resolve_workspace_path(cli: &Cli) -> Result<PathBuf> {

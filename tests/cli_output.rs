@@ -15,10 +15,48 @@ fn help_mentions_json_output_and_examples() -> Result<()> {
 
     let stdout = String::from_utf8(output.stdout)?;
     assert!(stdout.contains("--format"));
+    assert!(stdout.contains("--agent"));
     assert!(stdout.contains("Use `json` for Codex CLI"));
     assert!(stdout.contains("Quickstart:"));
     assert!(stdout.contains("heeforge doctor"));
+    assert!(stdout.contains("heeforge --format json --agent capabilities"));
     assert!(stdout.contains("heeforge --workspace ~/novels/my-book --format json status"));
+
+    Ok(())
+}
+
+#[test]
+fn capabilities_json_reports_agent_contract() -> Result<()> {
+    let temp_dir = tempdir()?;
+
+    let output = Command::new(novel_bin())
+        .current_dir(temp_dir.path())
+        .arg("--format")
+        .arg("json")
+        .arg("--agent")
+        .arg("capabilities")
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["schema_version"], 1);
+    assert_eq!(payload["agent_mode"], true);
+    assert_eq!(payload["command"], "capabilities");
+    assert_eq!(detail_value(&payload, "recommended_format"), Some("json"));
+    assert_eq!(detail_value(&payload, "recommended_flag"), Some("--agent"));
+    assert_eq!(
+        payload["data"]["recommended_invocation"],
+        "heeforge --format json --agent <command>"
+    );
+    assert!(payload["data"]["commands"].is_array());
+    assert!(payload["data"]["commands"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .any(|item| item["name"] == "next-scene" && item["requires_codex"] == true));
 
     Ok(())
 }
@@ -44,6 +82,8 @@ fn status_json_output_is_structured() -> Result<()> {
 
     let stdout = String::from_utf8(output.stdout)?;
     let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["schema_version"], 1);
+    assert_eq!(payload["agent_mode"], false);
     assert_eq!(payload["status"], "ok");
     assert_eq!(payload["command"], "status");
     assert_same_path(
@@ -58,6 +98,29 @@ fn status_json_output_is_structured() -> Result<()> {
     assert!(detail_value(&payload, "foundation_level").is_some());
     assert!(payload["details"].is_array());
     assert!(payload["next_steps"].is_array());
+
+    Ok(())
+}
+
+#[test]
+fn capabilities_agent_text_is_compact_key_value_output() -> Result<()> {
+    let temp_dir = tempdir()?;
+
+    let output = Command::new(novel_bin())
+        .current_dir(temp_dir.path())
+        .arg("--agent")
+        .arg("capabilities")
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("status=ok"));
+    assert!(stdout.contains("schema_version=1"));
+    assert!(stdout.contains("agent_mode=true"));
+    assert!(stdout.contains("command=capabilities"));
+    assert!(stdout.contains("detail.recommended_format=json"));
+    assert!(stdout.contains("body<<EOF"));
 
     Ok(())
 }
