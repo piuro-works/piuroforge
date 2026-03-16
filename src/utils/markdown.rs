@@ -4,10 +4,10 @@ use crate::models::Scene;
 
 pub fn render_scene(scene: &Scene) -> String {
     format!(
-        "# Scene {id}\n\n## Short Title\n{short_title}\n\n## Chapter Role\n{chapter_role}\n\n## Goal\n{goal}\n\n## Conflict\n{conflict}\n\n## Outcome\n{outcome}\n\n## Status\n{status}\n\n## Text\n{text}\n",
+        "# Scene {id}\n\n## Short Title\n{short_title}\n\n## Bundle Role\n{bundle_role}\n\n## Goal\n{goal}\n\n## Conflict\n{conflict}\n\n## Outcome\n{outcome}\n\n## Status\n{status}\n\n## Text\n{text}\n",
         id = scene.id.as_str(),
         short_title = scene.effective_short_title(),
-        chapter_role = scene.chapter_role.trim(),
+        bundle_role = scene.bundle_role.trim(),
         goal = scene.goal.trim(),
         conflict = scene.conflict.trim(),
         outcome = scene.outcome.trim(),
@@ -33,7 +33,7 @@ pub fn parse_scene(markdown: &str) -> Result<Scene> {
     let mut conflict = String::new();
     let mut outcome = String::new();
     let mut short_title = String::new();
-    let mut chapter_role = String::new();
+    let mut bundle_role = String::new();
     let mut status = String::new();
     let mut text = String::new();
     let mut current_section: Option<&str> = None;
@@ -46,7 +46,7 @@ pub fn parse_scene(markdown: &str) -> Result<Scene> {
 
         let target = match current_section {
             Some("Short Title") => &mut short_title,
-            Some("Chapter Role") => &mut chapter_role,
+            Some("Bundle Role") => &mut bundle_role,
             Some("Goal") => &mut goal,
             Some("Conflict") => &mut conflict,
             Some("Outcome") => &mut outcome,
@@ -61,14 +61,14 @@ pub fn parse_scene(markdown: &str) -> Result<Scene> {
         target.push_str(line);
     }
 
-    let (chapter, scene_number) = parse_scene_identity(&id)?;
+    let (bundle, scene_number) = parse_scene_identity(&id)?;
 
     Ok(Scene {
         id,
-        chapter,
+        bundle,
         scene_number,
         short_title: short_title.trim().to_string(),
-        chapter_role: chapter_role.trim().to_string(),
+        bundle_role: bundle_role.trim().to_string(),
         goal: goal.trim().to_string(),
         conflict: conflict.trim().to_string(),
         outcome: outcome.trim().to_string(),
@@ -84,8 +84,8 @@ pub fn parse_scene(markdown: &str) -> Result<Scene> {
     })
 }
 
-pub fn render_chapter(chapter: u32, short_title: &str, scenes: &[Scene]) -> String {
-    let mut content = format!("# Chapter {:03}\n\n", chapter);
+pub fn render_bundle(bundle: u32, short_title: &str, scenes: &[Scene]) -> String {
+    let mut content = format!("# Bundle {:03}\n\n", bundle);
     if !short_title.trim().is_empty() {
         content.push_str(&format!("## Short Title\n{}\n\n", short_title.trim()));
     }
@@ -98,8 +98,8 @@ pub fn render_chapter(chapter: u32, short_title: &str, scenes: &[Scene]) -> Stri
             scene.effective_short_title()
         ));
         content.push_str(&format!(
-            "Chapter role: {}\n\n",
-            scene.effective_chapter_role(scenes.len() as u32)
+            "Bundle role: {}\n\n",
+            scene.effective_bundle_role(scenes.len() as u32)
         ));
         content.push_str(&format!("Goal: {}\n\n", scene.goal.trim()));
         content.push_str(&format!("Conflict: {}\n\n", scene.conflict.trim()));
@@ -115,19 +115,19 @@ pub fn render_chapter(chapter: u32, short_title: &str, scenes: &[Scene]) -> Stri
 fn parse_scene_identity(scene_id: &str) -> Result<(u32, u32)> {
     let mut parts = scene_id.split('_');
     let prefix = parts.next().unwrap_or_default();
-    let chapter = parts.next().unwrap_or_default();
+    let bundle = parts.next().unwrap_or_default();
     let scene = parts.next().unwrap_or_default();
 
     if prefix != "scene" {
         return Err(anyhow!("invalid scene id '{}'", scene_id));
     }
 
-    let chapter = chapter
+    let bundle = bundle
         .parse::<u32>()
-        .with_context(|| format!("invalid chapter in scene id '{}'", scene_id))?;
+        .with_context(|| format!("invalid bundle in scene id '{}'", scene_id))?;
     let scene = scene
         .parse::<u32>()
         .with_context(|| format!("invalid scene number in scene id '{}'", scene_id))?;
 
-    Ok((chapter, scene))
+    Ok((bundle, scene))
 }

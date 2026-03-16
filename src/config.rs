@@ -23,7 +23,7 @@ pub struct Config {
     pub state_path: PathBuf,
     pub memory_dir: PathBuf,
     pub scenes_dir: PathBuf,
-    pub chapters_dir: PathBuf,
+    pub bundles_dir: PathBuf,
     pub review_feedback_dir: PathBuf,
     pub review_revisions_dir: PathBuf,
     pub workspace_readme_path: PathBuf,
@@ -57,7 +57,7 @@ impl Config {
         let state_path = novel_dir.join("state").join("project_state.json");
         let memory_dir = novel_dir.join("memory");
         let scenes_dir = workspace_dir.join("02_Draft").join("Scenes");
-        let chapters_dir = workspace_dir.join("02_Draft").join("Chapters");
+        let bundles_dir = workspace_dir.join("02_Draft").join("Bundles");
         let review_feedback_dir = workspace_dir.join("06_Review").join("Feedback");
         let review_revisions_dir = workspace_dir.join("06_Review").join("Revisions");
         let workspace_readme_path = workspace_dir.join("README.md");
@@ -83,7 +83,7 @@ impl Config {
             state_path,
             memory_dir,
             scenes_dir,
-            chapters_dir,
+            bundles_dir,
             review_feedback_dir,
             review_revisions_dir,
             workspace_readme_path,
@@ -166,8 +166,8 @@ default_language = {default_language:?}\n\
 #\n\
 # Writing policy defaults:\n\
 # - scene is the primary drafting unit; serialized workflows often treat one scene as one upload episode\n\
-# - serialized_workflow = true keeps the day-to-day loop scene-first and rolls internal chapter boundaries automatically after approval\n\
-# - chapter_scene_target = 3 means each internal chapter should usually draft as incident -> escalation -> cliffhanger\n\
+# - serialized_workflow = true keeps the day-to-day loop scene-first and rolls internal bundle boundaries automatically after approval\n\
+# - bundle_scene_target = 3 means each internal bundle should usually draft as incident -> escalation -> cliffhanger\n\
 # - Fill the story bible before serious drafting so planner and writer have real canon to follow\n\
 \n",
         );
@@ -189,8 +189,8 @@ default_language = {default_language:?}\n\
             self.novel_settings.serialized_workflow
         ));
         rendered.push_str(&format!(
-            "chapter_scene_target = {}\n",
-            self.novel_settings.chapter_scene_target.max(1)
+            "bundle_scene_target = {}\n",
+            self.novel_settings.bundle_scene_target.max(1)
         ));
         Ok(rendered)
     }
@@ -254,8 +254,8 @@ pub struct NovelSettings {
     pub protagonist_name: String,
     #[serde(default = "default_serialized_workflow")]
     pub serialized_workflow: bool,
-    #[serde(default = "default_chapter_scene_target")]
-    pub chapter_scene_target: u32,
+    #[serde(default = "default_bundle_scene_target")]
+    pub bundle_scene_target: u32,
 }
 
 impl Default for NovelSettings {
@@ -270,7 +270,7 @@ impl Default for NovelSettings {
             premise: String::new(),
             protagonist_name: String::new(),
             serialized_workflow: default_serialized_workflow(),
-            chapter_scene_target: default_chapter_scene_target(),
+            bundle_scene_target: default_bundle_scene_target(),
         }
     }
 }
@@ -306,7 +306,7 @@ fn default_serialized_workflow() -> bool {
     false
 }
 
-fn default_chapter_scene_target() -> u32 {
+fn default_bundle_scene_target() -> u32 {
     3
 }
 

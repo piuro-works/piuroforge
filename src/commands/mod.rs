@@ -4,7 +4,7 @@ pub mod doctor;
 pub mod expand_world;
 pub mod init;
 pub mod memory;
-pub mod next_chapter;
+pub mod next_bundle;
 pub mod next_scene;
 pub mod review;
 pub mod rewrite;

@@ -2,7 +2,7 @@ pub const SCAFFOLD_DIRS: &[&str] = &[
     "00_Inbox",
     "01_Brief",
     "02_Draft/Scenes",
-    "02_Draft/Chapters",
+    "02_Draft/Bundles",
     "02_Draft/Fragments",
     "02_Draft/Illustrations",
     "03_StoryBible/Characters",
@@ -76,8 +76,8 @@ pub fn scaffold_files(title: &str) -> Vec<WorkspaceFile> {
             content: SCENE_TEMPLATE.to_string(),
         },
         WorkspaceFile {
-            relative_path: "98_Templates/Chapter Template.md",
-            content: CHAPTER_TEMPLATE.to_string(),
+            relative_path: "98_Templates/Bundle Template.md",
+            content: BUNDLE_TEMPLATE.to_string(),
         },
         WorkspaceFile {
             relative_path: "98_Templates/Character Template.md",
@@ -119,7 +119,7 @@ This workspace separates human-facing manuscript files from PiuroForge runtime d
 2. Run `piuroforge doctor` in this workspace before the first real scene.\n\
 3. Before the first serious scene, fill at least one project brief, one plot note, one character or world note, and one style/tone guide if possible.\n\
 4. Treat `scene` as the primary draft unit. In serialized workflows, one scene usually maps to one upload episode.\n\
-5. Keep the default scene rhythm inside each chapter simple: incident -> escalation -> cliffhanger.\n\
+5. Keep the default scene rhythm inside each internal bundle simple: incident -> escalation -> cliffhanger.\n\
 6. If Doctor says ready, your PiuroForge setup is finished. You can move on to `piuroforge next-scene`.\n\
 7. Open `~/.config/piuroforge/config.toml` if you want to review your PiuroForge settings.\n\
 8. Leave `allow_dummy_fallback = false` for real drafting. Turn it on only if you intentionally want placeholder text while testing the folder workflow.\n\
@@ -130,7 +130,7 @@ If you run PiuroForge through another assistant, IDE agent, or sandboxed tool, t
 - `00_Inbox/`: raw captures, scraps, and external notes\n\
 - `01_Brief/`: briefs, pitches, and project framing docs\n\
 - `02_Draft/Scenes/`: primary draft units tracked in the novel repo; serialized workflows often use one scene per upload episode\n\
-- `02_Draft/Chapters/`: compiled internal bundles of multiple scenes tracked in the novel repo\n\
+- `02_Draft/Bundles/`: compiled internal bundles of multiple scenes tracked in the novel repo\n\
 - `02_Draft/Fragments/`: loose fragments and salvageable prose\n\
 - `02_Draft/Illustrations/`: art references and illustration notes\n\
 - `03_StoryBible/`: characters, world, rules, timeline, and plot docs\n\
@@ -176,7 +176,7 @@ Suggested file naming:
 - `BRIEF-002-Season-Package.md`
 
 This is the place to lock premise, target length, audience, and voice commitments before drafting accelerates.
-Also lock the default chapter rhythm here before scenes pile up.
+Also lock the default bundle rhythm here before scenes pile up.
 ";
 
 const DRAFT_README: &str = "\
@@ -185,7 +185,7 @@ const DRAFT_README: &str = "\
 Human-facing manuscript work lives here.
 
 - `Scenes/`: atomic scene files generated or revised during drafting; in many serialized workflows one scene maps to one upload episode
-- `Chapters/`: compiled internal manuscripts that bundle multiple scenes
+- `Bundles/`: compiled internal manuscripts that bundle multiple scenes
 - `Fragments/`: salvageable prose blocks, cut passages, alternates
 - `Illustrations/`: prompts, notes, or references for art packages
 
@@ -193,14 +193,14 @@ Generated scene naming:
 - `scene_001_001-securing-the-lead.md`
 - keep the stable scene id at the front so CLI commands can still target `scene_001_001`
 
-Default scene rhythm inside each chapter:
+Default scene rhythm inside each internal bundle:
 - scene 1 = incident
 - scene 2 = escalation
 - scene 3 = cliffhanger
 
-Generated chapter naming:
-- `chapter_001-securing-the-lead.md`
-- chapter slugs are derived from the compiled chapter short title
+Generated bundle naming:
+- `bundle_001-securing-the-lead.md`
+- bundle slugs are derived from the compiled bundle short title
 ";
 
 const STORY_BIBLE_README: &str = "\
@@ -212,7 +212,7 @@ Use this folder to separate durable canon from draft prose.
 - `World/`: locations, institutions, technology, cultures
 - `Rules/`: invariants, style rules, motif rules, system constraints
 - `Timeline/`: chronology, event sequence, date logic
-- `Plot/`: arc outlines, chapter maps, structural plans
+- `Plot/`: arc outlines, bundle maps, structural plans
 - `Voice/`: project-level style guides, tone notes, and genre voice rules
 
 Keep these files readable in Git. They should be reference material for future drafting, not runtime logs.
@@ -290,17 +290,17 @@ const STORY_BRIEF_TEMPLATE: &str = "\
 - What the prose must consistently do:
 - What the prose must avoid:
 
-## Chapter Structure Policy
-- Default chapter scene target: 3
+## Bundle Structure Policy
+- Default bundle scene target: 3
 - Scene progression: incident -> escalation -> cliffhanger
 - When to break the default:
 
 ## Story Engine
-- What generates the next chapter naturally?
+- What generates the next bundle naturally?
 - What keeps pressure on the cast?
 
 ## Delivery Targets
-- Chapter cadence:
+- Bundle cadence:
 - Scene density:
 - Review cadence:
 ";
@@ -314,10 +314,10 @@ const SCENE_TEMPLATE: &str = "\
 
 ## Viewpoint
 
-## Chapter Role
+## Bundle Role
 - incident / escalation / cliffhanger
 
-## Purpose In Chapter
+## Purpose In Bundle
 
 ## Objective
 
@@ -332,14 +332,14 @@ const SCENE_TEMPLATE: &str = "\
 ## Draft
 ";
 
-const CHAPTER_TEMPLATE: &str = "\
-# Chapter
+const BUNDLE_TEMPLATE: &str = "\
+# Bundle
 
-## Chapter ID
+## Bundle ID
 
 ## Short Title
 
-## Chapter Purpose
+## Bundle Purpose
 
 ## Structure Policy
 - Scene 1: incident

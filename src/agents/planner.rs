@@ -18,24 +18,24 @@ impl PlannerAgent {
     }
 
     fn build_prompt(&self, context: &AgentContext) -> Result<String> {
-        let chapter = context.state.current_chapter;
+        let bundle = context.state.current_bundle;
         let next_scene = context.state.current_scene + 1;
-        let chapter_scene_target = context.novel.chapter_scene_target.max(1);
+        let bundle_scene_target = context.novel.bundle_scene_target.max(1);
         let current_goal = context
             .state
             .current_goal
             .clone()
             .unwrap_or_else(|| "None".to_string());
         let open_conflicts = render_open_conflicts(&context.state.open_conflicts);
-        let chapter_role = crate::models::chapter_role_for(next_scene, chapter_scene_target);
+        let bundle_role = crate::models::bundle_role_for(next_scene, bundle_scene_target);
 
         Ok(render_template(
             PLANNER_TEMPLATE,
             &[
-                ("chapter", &chapter.to_string()),
+                ("bundle", &bundle.to_string()),
                 ("scene_number", &next_scene.to_string()),
-                ("chapter_scene_target", &chapter_scene_target.to_string()),
-                ("chapter_role", chapter_role.as_str()),
+                ("bundle_scene_target", &bundle_scene_target.to_string()),
+                ("bundle_role", bundle_role.as_str()),
                 ("title", context.novel.title.as_str()),
                 ("genre", context.novel.genre.as_str()),
                 ("tone", context.novel.tone.as_str()),
@@ -54,12 +54,12 @@ impl PlannerAgent {
     }
 
     fn dummy_plan(&self, context: &AgentContext) -> String {
-        let chapter = context.state.current_chapter;
+        let bundle = context.state.current_bundle;
         let scene_number = context.state.current_scene + 1;
 
         format!(
-            "{{\n  \"chapter\": {chapter},\n  \"scene_number\": {scene_number},\n  \"short_title\": \"Securing the Lead\",\n  \"goal\": \"The protagonist secures a concrete lead that moves the current arc forward.\",\n  \"conflict\": \"A trusted ally withholds a critical detail until the protagonist proves commitment.\",\n  \"outcome\": \"The protagonist earns partial trust, but the missing detail opens a larger threat.\"\n}}",
-            chapter = chapter,
+            "{{\n  \"bundle\": {bundle},\n  \"scene_number\": {scene_number},\n  \"short_title\": \"Securing the Lead\",\n  \"goal\": \"The protagonist secures a concrete lead that moves the current arc forward.\",\n  \"conflict\": \"A trusted ally withholds a critical detail until the protagonist proves commitment.\",\n  \"outcome\": \"The protagonist earns partial trust, but the missing detail opens a larger threat.\"\n}}",
+            bundle = bundle,
             scene_number = scene_number
         )
     }

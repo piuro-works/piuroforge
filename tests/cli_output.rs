@@ -936,7 +936,7 @@ fn expand_world_json_output_updates_story_memory() -> Result<()> {
 }
 
 #[test]
-fn next_chapter_json_output_includes_short_title_and_slugged_path() -> Result<()> {
+fn next_bundle_json_output_includes_short_title_and_slugged_path() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
     let global_dir = temp_dir.path().join("config-home");
@@ -951,7 +951,7 @@ fn next_chapter_json_output_includes_short_title_and_slugged_path() -> Result<()
         .arg(&workspace)
         .arg("--format")
         .arg("json")
-        .arg("next-chapter")
+        .arg("next-bundle")
         .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
@@ -960,27 +960,27 @@ fn next_chapter_json_output_includes_short_title_and_slugged_path() -> Result<()
     let stdout = String::from_utf8(output.stdout)?;
     let payload: Value = serde_json::from_str(&stdout)?;
     assert_eq!(payload["status"], "ok");
-    assert_eq!(payload["command"], "next-chapter");
-    assert_eq!(detail_value(&payload, "chapter"), Some("1"));
+    assert_eq!(payload["command"], "next-bundle");
+    assert_eq!(detail_value(&payload, "bundle"), Some("1"));
     assert_eq!(
         detail_value(&payload, "short_title"),
         Some("Securing the Lead")
     );
 
-    let chapter_path = payload["artifacts"]
+    let bundle_path = payload["artifacts"]
         .as_array()
         .and_then(|items| items.first())
         .and_then(|item| item["path"].as_str())
-        .ok_or_else(|| anyhow::anyhow!("missing chapter artifact path"))?;
-    assert!(chapter_path.ends_with("chapter_001-securing-the-lead.md"));
-    let chapter_markdown = std::fs::read_to_string(chapter_path)?;
-    assert!(chapter_markdown.contains("## Short Title\nSecuring the Lead"));
+        .ok_or_else(|| anyhow::anyhow!("missing bundle artifact path"))?;
+    assert!(bundle_path.ends_with("bundle_001-securing-the-lead.md"));
+    let bundle_markdown = std::fs::read_to_string(bundle_path)?;
+    assert!(bundle_markdown.contains("## Short Title\nSecuring the Lead"));
 
     Ok(())
 }
 
 #[test]
-fn next_scene_json_error_after_chapter_scene_target_is_reached() -> Result<()> {
+fn next_scene_json_error_after_bundle_scene_target_is_reached() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
     let global_dir = temp_dir.path().join("config-home");
@@ -1005,17 +1005,17 @@ fn next_scene_json_error_after_chapter_scene_target_is_reached() -> Result<()> {
     let payload: Value = serde_json::from_str(&stderr)?;
     assert_eq!(payload["status"], "error");
     assert_eq!(payload["command"], "next-scene");
-    assert_eq!(payload["error_code"], "chapter_scene_limit_reached");
+    assert_eq!(payload["error_code"], "bundle_scene_limit_reached");
     assert!(payload["reason"]
         .as_str()
         .unwrap_or_default()
-        .contains("chapter scene limit reached"));
+        .contains("bundle scene limit reached"));
 
     Ok(())
 }
 
 #[test]
-fn next_chapter_json_error_without_scenes_is_structured() -> Result<()> {
+fn next_bundle_json_error_without_scenes_is_structured() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
     let global_dir = temp_dir.path().join("config-home");
@@ -1027,7 +1027,7 @@ fn next_chapter_json_error_without_scenes_is_structured() -> Result<()> {
         .arg(&workspace)
         .arg("--format")
         .arg("json")
-        .arg("next-chapter")
+        .arg("next-bundle")
         .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
@@ -1036,12 +1036,12 @@ fn next_chapter_json_error_without_scenes_is_structured() -> Result<()> {
     let stderr = String::from_utf8(output.stderr)?;
     let payload: Value = serde_json::from_str(&stderr)?;
     assert_eq!(payload["status"], "error");
-    assert_eq!(payload["command"], "next-chapter");
-    assert_eq!(payload["error_code"], "empty_chapter");
+    assert_eq!(payload["command"], "next-bundle");
+    assert_eq!(payload["error_code"], "empty_bundle");
     assert!(payload["reason"]
         .as_str()
         .unwrap_or_default()
-        .contains("no scenes found for chapter 001"));
+        .contains("no scenes found for bundle 001"));
     assert!(payload["remediation"]
         .as_array()
         .unwrap_or(&vec![])
@@ -1052,7 +1052,7 @@ fn next_chapter_json_error_without_scenes_is_structured() -> Result<()> {
 }
 
 #[test]
-fn next_chapter_json_error_when_chapter_is_incomplete() -> Result<()> {
+fn next_bundle_json_error_when_bundle_is_incomplete() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
     let global_dir = temp_dir.path().join("config-home");
@@ -1065,7 +1065,7 @@ fn next_chapter_json_error_when_chapter_is_incomplete() -> Result<()> {
         .arg(&workspace)
         .arg("--format")
         .arg("json")
-        .arg("next-chapter")
+        .arg("next-bundle")
         .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
@@ -1074,18 +1074,18 @@ fn next_chapter_json_error_when_chapter_is_incomplete() -> Result<()> {
     let stderr = String::from_utf8(output.stderr)?;
     let payload: Value = serde_json::from_str(&stderr)?;
     assert_eq!(payload["status"], "error");
-    assert_eq!(payload["command"], "next-chapter");
-    assert_eq!(payload["error_code"], "chapter_incomplete");
+    assert_eq!(payload["command"], "next-bundle");
+    assert_eq!(payload["error_code"], "bundle_incomplete");
     assert!(payload["reason"]
         .as_str()
         .unwrap_or_default()
-        .contains("chapter scene target not reached"));
+        .contains("bundle scene target not reached"));
 
     Ok(())
 }
 
 #[test]
-fn next_chapter_json_error_for_gapped_sequence_is_structured() -> Result<()> {
+fn next_bundle_json_error_for_gapped_sequence_is_structured() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
     let global_dir = temp_dir.path().join("config-home");
@@ -1095,10 +1095,10 @@ fn next_chapter_json_error_for_gapped_sequence_is_structured() -> Result<()> {
         &workspace,
         Scene {
             id: "scene_001_001".to_string(),
-            chapter: 1,
+            bundle: 1,
             scene_number: 1,
             short_title: "Goal One".to_string(),
-            chapter_role: "incident".to_string(),
+            bundle_role: "incident".to_string(),
             goal: "Goal one".to_string(),
             conflict: "Conflict one".to_string(),
             outcome: "Outcome one".to_string(),
@@ -1110,10 +1110,10 @@ fn next_chapter_json_error_for_gapped_sequence_is_structured() -> Result<()> {
         &workspace,
         Scene {
             id: "scene_001_003".to_string(),
-            chapter: 1,
+            bundle: 1,
             scene_number: 3,
             short_title: "Goal Three".to_string(),
-            chapter_role: "cliffhanger".to_string(),
+            bundle_role: "cliffhanger".to_string(),
             goal: "Goal three".to_string(),
             conflict: "Conflict three".to_string(),
             outcome: "Outcome three".to_string(),
@@ -1127,7 +1127,7 @@ fn next_chapter_json_error_for_gapped_sequence_is_structured() -> Result<()> {
         .arg(&workspace)
         .arg("--format")
         .arg("json")
-        .arg("next-chapter")
+        .arg("next-bundle")
         .env("PIUROFORGE_CONFIG_DIR", &global_dir)
         .output()?;
 
@@ -1136,7 +1136,7 @@ fn next_chapter_json_error_for_gapped_sequence_is_structured() -> Result<()> {
     let stderr = String::from_utf8(output.stderr)?;
     let payload: Value = serde_json::from_str(&stderr)?;
     assert_eq!(payload["status"], "error");
-    assert_eq!(payload["command"], "next-chapter");
+    assert_eq!(payload["command"], "next-bundle");
     assert_eq!(payload["error_code"], "invalid_scene_sequence");
     assert!(payload["reason"]
         .as_str()

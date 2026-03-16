@@ -33,14 +33,14 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
     assert!(workspace.join("novel.toml").exists());
     assert!(workspace.join("README.md").exists());
     assert!(workspace.join("02_Draft/Scenes").exists());
-    assert!(workspace.join("02_Draft/Chapters").exists());
+    assert!(workspace.join("02_Draft/Bundles").exists());
     assert!(workspace.join("03_StoryBible/Characters").exists());
     assert!(workspace.join("03_StoryBible/Voice").exists());
     assert!(workspace.join("04_Research/Sources").exists());
     assert!(workspace.join("06_Review/Feedback").exists());
     assert!(workspace.join("06_Review/Revisions").exists());
     let workspace_config = std::fs::read_to_string(workspace.join("novel.toml"))?;
-    assert!(workspace_config.contains("chapter_scene_target = 3"));
+    assert!(workspace_config.contains("bundle_scene_target = 3"));
     assert!(workspace_config.contains("incident -> escalation -> cliffhanger"));
     assert!(workspace_config.contains("title = \"Demo Novel\""));
     let workspace_readme = std::fs::read_to_string(workspace.join("README.md"))?;
@@ -55,7 +55,7 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
     let draft_readme = std::fs::read_to_string(workspace.join("02_Draft/README.md"))?;
     assert!(draft_readme.contains("Human-facing manuscript work lives here."));
     let template = std::fs::read_to_string(workspace.join("98_Templates/Scene Template.md"))?;
-    assert!(template.contains("## Chapter Role"));
+    assert!(template.contains("## Bundle Role"));
     assert!(template.contains("incident / escalation / cliffhanger"));
     assert!(template.contains("## Objective"));
     let character_template =
@@ -135,7 +135,7 @@ fn generate_next_scene_requires_initial_novel_metadata() -> Result<()> {
 }
 
 #[test]
-fn generate_next_chapter_saves_slugged_markdown() -> Result<()> {
+fn generate_next_bundle_saves_slugged_markdown() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
     let engine = test_engine(workspace.clone(), temp_dir.path().join("config-home"))?;
@@ -144,31 +144,31 @@ fn generate_next_chapter_saves_slugged_markdown() -> Result<()> {
     engine.generate_next_scene()?;
     engine.generate_next_scene()?;
     engine.generate_next_scene()?;
-    let chapter_path = engine.generate_next_chapter()?;
+    let bundle_path = engine.generate_next_bundle()?;
 
     assert_eq!(
-        chapter_path
+        bundle_path
             .file_name()
             .and_then(|value| value.to_str())
             .unwrap_or_default(),
-        "chapter_001-securing-the-lead.md"
+        "bundle_001-securing-the-lead.md"
     );
 
-    let content = std::fs::read_to_string(&chapter_path)?;
-    assert!(content.contains("# Chapter 001"));
+    let content = std::fs::read_to_string(&bundle_path)?;
+    assert!(content.contains("# Bundle 001"));
     assert!(content.contains("## Short Title\nSecuring the Lead"));
     assert!(!content.contains("Status: draft\ndraft"));
 
     let state = engine.get_status()?;
-    assert_eq!(state.current_chapter, 2);
+    assert_eq!(state.current_bundle, 2);
     assert_eq!(state.current_scene, 0);
-    assert_eq!(state.stage, "chapter_ready");
+    assert_eq!(state.stage, "bundle_ready");
 
     Ok(())
 }
 
 #[test]
-fn generate_next_scene_stops_after_chapter_scene_target() -> Result<()> {
+fn generate_next_scene_stops_after_bundle_scene_target() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
     let engine = test_engine(workspace.clone(), temp_dir.path().join("config-home"))?;
@@ -180,14 +180,14 @@ fn generate_next_scene_stops_after_chapter_scene_target() -> Result<()> {
 
     let error = engine
         .generate_next_scene()
-        .expect_err("expected chapter scene target limit");
-    assert!(error.to_string().contains("chapter scene limit reached"));
+        .expect_err("expected bundle scene target limit");
+    assert!(error.to_string().contains("bundle scene limit reached"));
 
     Ok(())
 }
 
 #[test]
-fn serialized_workflow_auto_advances_internal_chapter_after_approval() -> Result<()> {
+fn serialized_workflow_auto_advances_internal_bundle_after_approval() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
     let global_dir = temp_dir.path().join("config-home");
@@ -227,14 +227,14 @@ fn serialized_workflow_auto_advances_internal_chapter_after_approval() -> Result
     assert_eq!(fourth.id, "scene_002_001");
 
     let state = engine.get_status()?;
-    assert_eq!(state.current_chapter, 2);
+    assert_eq!(state.current_bundle, 2);
     assert_eq!(state.current_scene, 1);
 
     Ok(())
 }
 
 #[test]
-fn serialized_workflow_can_compile_previous_completed_chapter_bundle() -> Result<()> {
+fn serialized_workflow_can_compile_previous_completed_bundle() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
     let global_dir = temp_dir.path().join("config-home");
@@ -263,17 +263,17 @@ fn serialized_workflow_can_compile_previous_completed_chapter_bundle() -> Result
     let fourth = engine.generate_next_scene()?.value;
     assert_eq!(fourth.id, "scene_002_001");
 
-    let chapter_path = engine.generate_next_chapter()?;
+    let bundle_path = engine.generate_next_bundle()?;
     assert_eq!(
-        chapter_path
+        bundle_path
             .file_name()
             .and_then(|value| value.to_str())
             .unwrap_or_default(),
-        "chapter_001-securing-the-lead.md"
+        "bundle_001-securing-the-lead.md"
     );
 
     let state = engine.get_status()?;
-    assert_eq!(state.current_chapter, 2);
+    assert_eq!(state.current_bundle, 2);
     assert_eq!(state.current_scene, 1);
 
     Ok(())
@@ -337,7 +337,7 @@ fn review_and_rewrite_persist_artifacts() -> Result<()> {
 }
 
 #[test]
-fn next_chapter_rejects_gapped_scene_sequence() -> Result<()> {
+fn next_bundle_rejects_gapped_scene_sequence() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
     let engine = test_engine(workspace.clone(), temp_dir.path().join("config-home"))?;
@@ -347,10 +347,10 @@ fn next_chapter_rejects_gapped_scene_sequence() -> Result<()> {
         &workspace,
         Scene {
             id: "scene_001_001".to_string(),
-            chapter: 1,
+            bundle: 1,
             scene_number: 1,
             short_title: "Goal One".to_string(),
-            chapter_role: "incident".to_string(),
+            bundle_role: "incident".to_string(),
             goal: "Goal one".to_string(),
             conflict: "Conflict one".to_string(),
             outcome: "Outcome one".to_string(),
@@ -362,10 +362,10 @@ fn next_chapter_rejects_gapped_scene_sequence() -> Result<()> {
         &workspace,
         Scene {
             id: "scene_001_003".to_string(),
-            chapter: 1,
+            bundle: 1,
             scene_number: 3,
             short_title: "Goal Three".to_string(),
-            chapter_role: "cliffhanger".to_string(),
+            bundle_role: "cliffhanger".to_string(),
             goal: "Goal three".to_string(),
             conflict: "Conflict three".to_string(),
             outcome: "Outcome three".to_string(),
@@ -375,7 +375,7 @@ fn next_chapter_rejects_gapped_scene_sequence() -> Result<()> {
     )?;
 
     let error = engine
-        .generate_next_chapter()
+        .generate_next_bundle()
         .expect_err("expected sequence validation error");
     assert!(error.to_string().contains("scene order is invalid"));
 
@@ -489,10 +489,10 @@ impl NovelBackend for StubBackend {
         Ok(SceneGenerationResponse {
             final_scene: Scene {
                 id: request.scene_id,
-                chapter: request.chapter,
+                bundle: request.bundle,
                 scene_number: request.scene_number,
                 short_title: "Backend Separation".to_string(),
-                chapter_role: "incident".to_string(),
+                bundle_role: "incident".to_string(),
                 goal: "Prove the control engine only persists and advances state.".to_string(),
                 conflict: "The Codex-facing generation path must stay behind the backend boundary."
                     .to_string(),

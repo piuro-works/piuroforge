@@ -1,32 +1,32 @@
 use anyhow::Result;
 
 use crate::engine::NovelEngine;
-use crate::models::chapter_role_for;
+use crate::models::bundle_role_for;
 use crate::output::CommandOutput;
 
 pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
     let state = engine.get_status()?;
     let missing = engine.missing_required_novel_fields();
     let foundation = engine.story_foundation_status()?;
-    let chapter_scene_target = engine.chapter_scene_target();
+    let bundle_scene_target = engine.bundle_scene_target();
     let serialized_workflow = engine.serialized_workflow_enabled();
-    let next_scene_role = if state.current_scene < chapter_scene_target {
-        chapter_role_for(state.current_scene + 1, chapter_scene_target)
+    let next_scene_role = if state.current_scene < bundle_scene_target {
+        bundle_role_for(state.current_scene + 1, bundle_scene_target)
     } else {
         "-".to_string()
     };
 
     let summary = if !missing.is_empty() {
         "Workspace scaffold exists, but novel config is still incomplete."
-    } else if state.current_scene >= chapter_scene_target {
+    } else if state.current_scene >= bundle_scene_target {
         if serialized_workflow {
             if state.stage == "scene_approved" {
-                "Current serialized scene bundle is full. The next scene will start a new internal chapter automatically."
+                "Current serialized scene bundle is full. The next scene will start a new internal bundle automatically."
             } else {
                 "Current serialized scene bundle is full. Approve the current scene before drafting the next serialized scene."
             }
         } else {
-            "Chapter scene target is full. Compile the chapter before drafting more scenes."
+            "Bundle scene target is full. Compile the bundle before drafting more scenes."
         }
     } else if foundation.score < 40 {
         "Workspace is technically ready, but the story foundation is still skeletal."
@@ -35,20 +35,20 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
     } else if state.current_scene_id.is_none() {
         "Workspace is ready for the first scene."
     } else if state.stage == "scene_approved" {
-        "Current scene is approved. You can draft the next scene or compile a chapter."
+        "Current scene is approved. You can draft the next scene or compile a bundle."
     } else {
         "Current scene is in progress."
     };
 
     let mut output = CommandOutput::ok("status", engine.workspace_dir(), summary)
         .detail("arc", state.current_arc.to_string())
-        .detail("chapter", state.current_chapter.to_string())
+        .detail("bundle", state.current_bundle.to_string())
         .detail("scene", state.current_scene.to_string())
-        .detail("chapter_scene_target", chapter_scene_target.to_string())
+        .detail("bundle_scene_target", bundle_scene_target.to_string())
         .detail("serialized_workflow", serialized_workflow.to_string())
         .detail(
-            "chapter_progress",
-            format!("{}/{}", state.current_scene, chapter_scene_target),
+            "bundle_progress",
+            format!("{}/{}", state.current_scene, bundle_scene_target),
         )
         .detail("next_scene_role", next_scene_role)
         .detail("stage", state.stage.clone())
@@ -103,23 +103,23 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
             ));
         }
 
-        if state.current_scene >= chapter_scene_target {
+        if state.current_scene >= bundle_scene_target {
             if serialized_workflow {
                 if state.stage == "scene_approved" {
                     output = output
                         .warning(format!(
-                            "Internal chapter {:03} already has {} scene(s). The next `next-scene` call will roll into chapter {:03} automatically.",
-                            state.current_chapter,
-                            chapter_scene_target,
-                            state.current_chapter + 1
+                            "Internal bundle {:03} already has {} scene(s). The next `next-scene` call will roll into bundle {:03} automatically.",
+                            state.current_bundle,
+                            bundle_scene_target,
+                            state.current_bundle + 1
                         ))
                         .next_step(super::workspace_command(engine, "next-scene"))
-                        .next_step(super::workspace_command(engine, "next-chapter"));
+                        .next_step(super::workspace_command(engine, "next-bundle"));
                 } else {
                     output = output.warning(format!(
-                        "Internal chapter {:03} already has {} scene(s). Review and approve the current scene before drafting the next serialized scene.",
-                        state.current_chapter,
-                        chapter_scene_target
+                        "Internal bundle {:03} already has {} scene(s). Review and approve the current scene before drafting the next serialized scene.",
+                        state.current_bundle,
+                        bundle_scene_target
                     ));
                     if let Some(scene_id) = state.current_scene_id.as_deref() {
                         output = output
@@ -137,12 +137,12 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
             } else {
                 output = output
                     .warning(format!(
-                        "Chapter {:03} already has {} scene(s), which matches the target. Compile it before drafting scene {:03}.",
-                        state.current_chapter,
-                        chapter_scene_target,
-                        chapter_scene_target + 1
+                        "Bundle {:03} already has {} scene(s), which matches the target. Compile it before drafting scene {:03}.",
+                        state.current_bundle,
+                        bundle_scene_target,
+                        bundle_scene_target + 1
                     ))
-                    .next_step(super::workspace_command(engine, "next-chapter"));
+                    .next_step(super::workspace_command(engine, "next-bundle"));
 
                 if let Some(scene_id) = state.current_scene_id.as_deref() {
                     output = output.next_step(super::workspace_command(

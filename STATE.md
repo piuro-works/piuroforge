@@ -11,7 +11,7 @@
 - `NovelEngine`는 이제 workspace/state/file 제어를 맡고, Codex 기반 scene/review/rewrite/world generation은 주입 가능한 `NovelBackend` 경계 뒤로 분리됐다.
 - LLM 호출 경계도 `PromptRunner` 추상화로 분리되어, Codex 외 CLI runner를 추가해도 planner/writer/editor/critic orchestration을 재사용할 수 있다.
 - planner/critic payload는 이제 더 엄격한 JSON schema validation을 거치며, malformed payload는 `invalid_llm_payload` 계열 에러로 실패한다.
-- `novel.toml`은 작가용 주석과 함께 `chapter_scene_target` 기본값을 노출하며, 기본 drafting 구조를 `incident -> escalation -> cliffhanger`로 안내한다.
+- `novel.toml`은 작가용 주석과 함께 `bundle_scene_target` 기본값을 노출하며, 기본 drafting 구조를 `incident -> escalation -> cliffhanger`로 안내한다.
 - project-level 문체 제어를 위해 `03_StoryBible/Voice/` 문서를 foundation에 포함하고, named-author imitation 대신 style/tone/genre/voice guide를 읽도록 방향을 잡았다.
 - 워크스페이스 기반 저장 모델이 적용되어 사람용 소설 데이터는 워크스페이스 루트의 numbered folder에, 엔진 런타임 데이터는 `.novel/`에 분리 저장된다.
 - `1 workspace = 1 novel` 정책을 문서와 초기화 로직에 반영했다.
@@ -20,7 +20,7 @@
 - `piuroforge init`은 루트/섹션 `README.md`와 `98_Templates` starter template 파일도 생성한다.
 - 전역 `config.toml` 생성 내용이 작가용 first-run 설명과 codex/dummy fallback 안내를 포함하도록 보강됐다.
 - scene markdown는 stable `scene_id`를 앞에 유지한 slugged filename으로 저장되며, slug는 scene `short_title` 기준으로 생성된다.
-- chapter markdown는 compiled `short_title`을 포함하고 slugged filename으로 저장된다.
+- bundle markdown는 compiled `short_title`을 포함하고 slugged filename으로 저장된다.
 - 설정 계층이 `~/.config/piuroforge/config.toml`, `<workspace>/novel.toml`, `<workspace>/.novel/workspace.json`으로 분리됐다.
 - `piuroforge init`은 필수 메타를 인터랙티브하게 수집할 수 있다.
 - CLI 전역 옵션 `--format text|json`이 추가됐다.
@@ -47,21 +47,21 @@
 - smoke test가 injected stub backend로도 scene 생성이 되는지 검증해, control engine과 Codex generation backend 경계가 유지되는지 확인한다.
 - `novel_backend` fixture runner 통합 테스트가 planner/writer/editor/critic/world expansion 전체 흐름을 fake CLI runner로 검증한다.
 - planner/writer/editor/critic 프롬프트 템플릿이 `src/prompts/`로 분리됐다.
-- planner/writer/editor/critic은 이제 scene의 `chapter_role`과 character voice guide를 함께 사용해 장면 역할과 대화 톤을 더 직접적으로 통제한다.
+- planner/writer/editor/critic은 이제 scene의 `bundle_role`과 character voice guide를 함께 사용해 장면 역할과 대화 톤을 더 직접적으로 통제한다.
 - planner/writer/editor/critic은 `03_StoryBible/Voice/`의 safe style guide도 읽어 프로젝트 전체 문체를 descriptive traits와 genre/tone guidance 기준으로 맞춘다.
 - story foundation은 이제 agent별 view로 분리되어, planner/writer/editor/critic/world expansion이 서로 다른 canon slice를 받아 컨텍스트 폭주를 줄인다.
 - scene 생성 로그는 `.novel/logs/`에, review JSON과 rewrite snapshot은 `06_Review/`에 저장된다.
-- `next-chapter`는 scene 번호 연속성을 검증한다.
-- `next-scene`은 현재 chapter가 `chapter_scene_target`에 도달하면 추가 scene 생성을 막고, `next-chapter`는 scene 수가 target과 맞지 않으면 컴파일을 거부한다.
+- `next-bundle`는 scene 번호 연속성을 검증한다.
+- `next-scene`은 현재 bundle이 `bundle_scene_target`에 도달하면 추가 scene 생성을 막고, `next-bundle`는 scene 수가 target과 맞지 않으면 컴파일을 거부한다.
 - `CodexRunner`는 호출 실패 시 1회 재시도한다.
 - `CodexRunner`는 응답 timeout을 넘기면 subprocess를 강제 종료한다.
 - `CodexRunner`는 `--json` + `--output-last-message` 조합으로 Codex 진행 이벤트를 읽고, agent별 더 긴 timeout(writer/critic 등)과 stderr progress 표시를 사용한다.
 - 바이너리 테스트가 하위 디렉터리 실행 시 nearest workspace 자동 탐색을 검증한다.
 - 바이너리 테스트가 `rewrite`/`approve`의 JSON 출력, 산출물 보존, 상태 전이를 검증한다.
-- 바이너리 테스트가 `init`, `status`, `next-scene`, `review`, `rewrite`, `approve`, `next-chapter`, `expand-world`, `memory`, `show` 전 커맨드의 JSON 계약을 검증한다.
-- 바이너리 테스트가 `review`의 current scene 부재, `next-chapter`의 empty/gapped chapter, `show`의 미존재 scene 조회 같은 고위험 실패 경로의 JSON 에러 계약도 검증한다.
+- 바이너리 테스트가 `init`, `status`, `next-scene`, `review`, `rewrite`, `approve`, `next-bundle`, `expand-world`, `memory`, `show` 전 커맨드의 JSON 계약을 검증한다.
+- 바이너리 테스트가 `review`의 current scene 부재, `next-bundle`의 empty/gapped bundle, `show`의 미존재 scene 조회 같은 고위험 실패 경로의 JSON 에러 계약도 검증한다.
 - 바이너리 테스트가 기본 codex 실패 시 `codex_unavailable` 에러와 opt-in dummy fallback warning 노출도 검증한다.
-- `NovelEngine`가 scene 생성, 리뷰, 수정, 승인, chapter 컴파일, memory 조회를 오케스트레이션한다.
+- `NovelEngine`가 scene 생성, 리뷰, 수정, 승인, bundle 컴파일, memory 조회를 오케스트레이션한다.
 - `CodexRunner`는 `codex` CLI subprocess만 사용하도록 구현되어 있다.
 - `StateManager`와 `MemoryManager`가 기본 파일 생성과 로드/저장을 처리한다.
 - smoke test 파일 `tests/smoke.rs`가 존재한다.
@@ -75,24 +75,24 @@
 - `PIUROFORGE_CONFIG_DIR=<temp> piuroforge init <workspace>`로 전역 `config.toml`, 워크스페이스 `novel.toml`, 내부 `workspace.json` 생성이 확인됐다.
 - smoke test가 사람용 `02_Draft`, `03_StoryBible`, `06_Review` 스캐폴드와 워크스페이스 `README.md` 생성을 검증한다.
 - smoke test가 섹션 `README.md`와 template 파일 생성도 검증한다.
-- `cargo test`에서 생성 로그, review 저장, rewrite snapshot, chapter 순서 검증, codex retry가 확인됐다.
+- `cargo test`에서 생성 로그, review 저장, rewrite snapshot, bundle 순서 검증, codex retry가 확인됐다.
 - unit test가 oversized `story_memory`의 prompt compaction과 `open_conflicts` recent-window 축약을 검증한다.
 - codex runner test가 opt-in prompt logging 파일 생성과 로그 payload 저장을 검증한다.
 - 바이너리 테스트가 workspace Git auto-commit이 `init`과 `next-scene` 뒤에 실제 commit을 남기는지 검증한다.
 - `cargo test`에서 rewrite metadata가 workspace 상대경로를 저장하는지 확인됐다.
 - smoke test와 CLI test가 `scene_001_001-...` 형식의 slugged scene filename 생성을 검증한다.
 - planner dummy path와 scene markdown 저장 포맷이 `short_title` 필드를 포함하도록 갱신됐다.
-- smoke test와 CLI test가 `chapter_001-securing-the-lead.md` 형식의 slugged chapter filename과 `Short Title` 섹션 생성을 검증한다.
+- smoke test와 CLI test가 `bundle_001-securing-the-lead.md` 형식의 slugged bundle filename과 `Short Title` 섹션 생성을 검증한다.
 - smoke test가 필수 메타 누락 시 scene 생성 차단도 검증한다.
-- smoke test가 `chapter_scene_target` 기본값과 새 template 필드 생성을 검증한다.
+- smoke test가 `bundle_scene_target` 기본값과 새 template 필드 생성을 검증한다.
 - 인터랙티브 `piuroforge init`로 `premise`, `protagonist_name` 입력 후 `novel.toml` 반영이 확인됐다.
 - 바이너리 테스트에서 `--help`, `status --format json`, `next-scene --format json` 에러 payload가 검증됐다.
 - 바이너리 테스트에서 워크스페이스 하위 디렉터리의 `status`, `next-scene` 실행 시 nearest workspace 자동 탐색이 검증됐다.
 - 바이너리 테스트에서 `rewrite scene_001_001 --instruction ...`가 rewrite snapshot과 scene 갱신을 남기는지 검증됐다.
 - 바이너리 테스트에서 `approve scene_001_001`가 scene markdown 상태와 `status`의 `scene_approved` 전이를 반영하는지 검증됐다.
 - 바이너리 테스트에서 `init`, `review`, `show`, `memory`, `expand-world` JSON 출력과 관련 산출물 반영이 검증됐다.
-- 바이너리 테스트에서 `review`의 `no_current_scene`, `next-chapter`의 `empty_chapter`/`invalid_scene_sequence`, `show`의 missing scene generic error payload가 검증됐다.
-- 바이너리 테스트와 smoke test가 chapter scene target 초과 생성 차단과 incomplete chapter compile 차단을 검증한다.
+- 바이너리 테스트에서 `review`의 `no_current_scene`, `next-bundle`의 `empty_bundle`/`invalid_scene_sequence`, `show`의 missing scene generic error payload가 검증됐다.
+- 바이너리 테스트와 smoke test가 bundle scene target 초과 생성 차단과 incomplete bundle compile 차단을 검증한다.
 - 로컬 release asset을 만든 뒤 `PIUROFORGE_DOWNLOAD_URL=file://... ./install.sh` 설치 smoke check가 통과했다.
 - `v1.0.0` tag push 후 GitHub Actions release workflow가 성공적으로 release 자산을 게시했다.
 - hang 재현 테스트에서 `codex exec` timeout과 no-retry 동작이 검증됐다.
@@ -105,13 +105,13 @@
 ## Known Gaps / Risks
 
 - opt-in dummy fallback 출력은 결정적이지만 문학적 품질은 낮다.
-- chapter 승인 정책과 open conflict 해소 정책은 아직 단순하다.
+- bundle 승인 정책과 open conflict 해소 정책은 아직 단순하다.
 - 실제 codex 응답 형식이 JSON 규약을 어기면 즉시 실패하므로, backend별 prompt/adapter 품질 관리가 더 중요해졌다.
 - JSON 출력 계약은 현재 안정화됐지만 아직 command별 세부 schema versioning은 없다.
 - 실제 codex 응답 시간이 긴 작업에서는 기본 120초 timeout이 짧을 수 있어 운영 환경에 맞춘 조정이 필요할 수 있다.
 
 ## Recommended Next Actions
 
-1. chapter/arc summary memory를 자동 생성한다.
+1. bundle/arc summary memory를 자동 생성한다.
 2. `doctor` 명령에 backend별 설치/로그인 가이드를 확장한다.
 3. GitHub Release 원격 자산을 대상으로 `install.sh` end-to-end smoke check를 한 번 더 수행한다.

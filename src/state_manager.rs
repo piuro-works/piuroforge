@@ -36,10 +36,10 @@ impl StateManager {
     }
 
     pub fn next_scene_identity(&self, state: &StoryState) -> (u32, u32, String) {
-        let chapter = state.current_chapter;
+        let bundle = state.current_bundle;
         let scene_number = state.current_scene + 1;
-        let scene_id = format!("scene_{:03}_{:03}", chapter, scene_number);
-        (chapter, scene_number, scene_id)
+        let scene_id = format!("scene_{:03}_{:03}", bundle, scene_number);
+        (bundle, scene_number, scene_id)
     }
 
     pub fn update_stage(&self, state: &mut StoryState, stage: impl Into<String>) {
@@ -51,7 +51,7 @@ impl StateManager {
     }
 
     pub fn mark_scene_generated(&self, state: &mut StoryState, scene: &Scene) {
-        state.current_chapter = scene.chapter;
+        state.current_bundle = scene.bundle;
         state.current_scene = scene.scene_number;
         state.current_goal = Some(scene.goal.clone());
         self.update_current_scene_id(state, Some(scene.id.clone()));
@@ -72,11 +72,11 @@ impl StateManager {
         }
     }
 
-    pub fn begin_next_chapter(&self, state: &mut StoryState) {
-        state.current_chapter += 1;
+    pub fn begin_next_bundle(&self, state: &mut StoryState) {
+        state.current_bundle += 1;
         state.current_scene = 0;
         state.current_goal = None;
         state.current_scene_id = None;
-        self.update_stage(state, "chapter_ready");
+        self.update_stage(state, "bundle_ready");
     }
 }

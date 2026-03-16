@@ -10,7 +10,7 @@ Genre: {{genre}}
 Tone: {{tone}}
 Premise: {{premise}}
 Protagonist: {{protagonist_name}}
-Chapter role: {{chapter_role}}
+Bundle role: {{bundle_role}}
 
 Goal: {{goal}}
 Conflict: {{conflict}}
@@ -21,7 +21,7 @@ Critique priorities:
 - show-vs-tell problems
 - repeated wording or repetitive sentence structures
 - dialogue voices collapsing into the same tone
-- chapter-role failure: incident too weak, escalation too flat, or cliffhanger without pull
+- bundle-role failure: incident too weak, escalation too flat, or cliffhanger without pull
 - scene length or density feeling clearly undercooked or bloated
 
 Story foundation:

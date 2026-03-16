@@ -384,43 +384,43 @@ impl ErrorOutput {
                 error_code: "invalid_scene_sequence".to_string(),
                 reason,
                 remediation: vec![
-                    "Check scene files and ensure each chapter has scene numbers 001..N without gaps.".to_string(),
-                    "Re-run next-chapter after fixing the missing or duplicated scene numbers.".to_string(),
+                    "Check scene files and ensure each bundle has scene numbers 001..N without gaps.".to_string(),
+                    "Re-run next-bundle after fixing the missing or duplicated scene numbers.".to_string(),
                 ],
-                example_command: Some(example_for("next-chapter", workspace)),
+                example_command: Some(example_for("next-bundle", workspace)),
                 details: vec![],
             };
         }
 
-        if reason.contains("chapter scene limit reached") {
+        if reason.contains("bundle scene limit reached") {
             return Self {
                 schema_version: OUTPUT_SCHEMA_VERSION,
                 status: "error",
                 agent_mode: false,
                 command: command.to_string(),
                 workspace: workspace_display,
-                error_code: "chapter_scene_limit_reached".to_string(),
+                error_code: "bundle_scene_limit_reached".to_string(),
                 reason,
                 remediation: vec![
-                    "Compile the current chapter before drafting more scenes.".to_string(),
-                    example_for("next-chapter", workspace),
+                    "Compile the current bundle before drafting more scenes.".to_string(),
+                    example_for("next-bundle", workspace),
                 ],
-                example_command: Some(example_for("next-chapter", workspace)),
+                example_command: Some(example_for("next-bundle", workspace)),
                 details: vec![],
             };
         }
 
-        if reason.contains("chapter scene target not reached") {
+        if reason.contains("bundle scene target not reached") {
             return Self {
                 schema_version: OUTPUT_SCHEMA_VERSION,
                 status: "error",
                 agent_mode: false,
                 command: command.to_string(),
                 workspace: workspace_display,
-                error_code: "chapter_incomplete".to_string(),
+                error_code: "bundle_incomplete".to_string(),
                 reason,
                 remediation: vec![
-                    "Finish the missing scene roles for this chapter before compiling it."
+                    "Finish the missing scene roles for this bundle before compiling it."
                         .to_string(),
                     example_for("status", workspace),
                     example_for("next-scene", workspace),
@@ -430,17 +430,17 @@ impl ErrorOutput {
             };
         }
 
-        if reason.contains("no scenes found for chapter") {
+        if reason.contains("no scenes found for bundle") {
             return Self {
                 schema_version: OUTPUT_SCHEMA_VERSION,
                 status: "error",
                 agent_mode: false,
                 command: command.to_string(),
                 workspace: workspace_display,
-                error_code: "empty_chapter".to_string(),
+                error_code: "empty_bundle".to_string(),
                 reason,
                 remediation: vec![
-                    "Generate at least one scene before compiling a chapter.".to_string(),
+                    "Generate at least one scene before compiling a bundle.".to_string(),
                     example_for("next-scene", workspace),
                 ],
                 example_command: Some(example_for("next-scene", workspace)),

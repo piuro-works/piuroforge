@@ -70,10 +70,10 @@ Examples:
   piuroforge --workspace ~/novels/my-book --format json approve scene_001_001
 ";
 
-const NEXT_CHAPTER_AFTER_HELP: &str = "\
+const NEXT_BUNDLE_AFTER_HELP: &str = "\
 Examples:
-  piuroforge next-chapter
-  piuroforge --workspace ~/novels/my-book --format json next-chapter
+  piuroforge next-bundle
+  piuroforge --workspace ~/novels/my-book --format json next-bundle
 ";
 
 const EXPAND_WORLD_AFTER_HELP: &str = "\
@@ -99,7 +99,7 @@ Examples:
     name = "piuroforge",
     version,
     about = "PiuroForge CLI novel engine for one workspace = one novel.",
-    long_about = "PiuroForge creates one novel workspace, then generates, reviews, rewrites, approves, and compiles scenes from the terminal. `scene` is the primary drafting unit, and serialized workflows often treat one scene as one upload episode. `chapter` compiles multiple scenes into an internal manuscript bundle. Use `--format json` when another LLM agent needs stable, machine-readable output.",
+    long_about = "PiuroForge creates one novel workspace, then generates, reviews, rewrites, approves, and compiles scenes from the terminal. `scene` is the primary drafting unit, and serialized workflows often treat one scene as one upload episode. `bundle` groups multiple scenes into an internal manuscript bundle. Use `--format json` when another LLM agent needs stable, machine-readable output.",
     after_long_help = CLI_AFTER_HELP
 )]
 struct Cli {
@@ -176,10 +176,10 @@ enum NovelCommand {
     )]
     Approve { scene_id: String },
     #[command(
-        about = "Compile the current chapter markdown by bundling the chapter's scenes after validating scene order.",
-        after_long_help = NEXT_CHAPTER_AFTER_HELP
+        about = "Compile the current bundle markdown by bundling the current bundle's scenes after validating scene order.",
+        after_long_help = NEXT_BUNDLE_AFTER_HELP
     )]
-    NextChapter,
+    NextBundle,
     #[command(
         about = "Append one new worldbuilding section to story memory.",
         after_long_help = EXPAND_WORLD_AFTER_HELP
@@ -208,7 +208,7 @@ impl NovelCommand {
             Self::Review => "review",
             Self::Rewrite { .. } => "rewrite",
             Self::Approve { .. } => "approve",
-            Self::NextChapter => "next-chapter",
+            Self::NextBundle => "next-bundle",
             Self::ExpandWorld => "expand-world",
             Self::Memory => "memory",
             Self::Show { .. } => "show",
@@ -286,9 +286,9 @@ fn run(cli: Cli) -> Result<CommandOutput> {
             let engine = NovelEngine::new(Config::new(workspace)?)?;
             commands::approve::run(&engine, &scene_id)
         }
-        NovelCommand::NextChapter => {
+        NovelCommand::NextBundle => {
             let engine = NovelEngine::new(Config::new(workspace)?)?;
-            commands::next_chapter::run(&engine)
+            commands::next_bundle::run(&engine)
         }
         NovelCommand::ExpandWorld => {
             let engine = NovelEngine::new(Config::new(workspace)?)?;

@@ -6,12 +6,12 @@ use crate::utils::files::{append_string, ensure_dir, read_string_if_exists, writ
 
 const PROMPT_STORY_MEMORY_CHAR_LIMIT: usize = 18_000;
 const PROMPT_SCENE_SECTION_LIMIT: usize = 700;
-const PROMPT_CHAPTER_SECTION_LIMIT: usize = 500;
+const PROMPT_BUNDLE_SECTION_LIMIT: usize = 500;
 const PROMPT_REWRITE_SECTION_LIMIT: usize = 350;
 const PROMPT_WORLD_SECTION_LIMIT: usize = 1_800;
 const PROMPT_OTHER_SECTION_LIMIT: usize = 700;
 const PROMPT_SCENE_SECTION_KEEP: usize = 10;
-const PROMPT_CHAPTER_SECTION_KEEP: usize = 6;
+const PROMPT_BUNDLE_SECTION_KEEP: usize = 6;
 const PROMPT_REWRITE_SECTION_KEEP: usize = 3;
 const PROMPT_WORLD_SECTION_KEEP: usize = 4;
 const PROMPT_OTHER_SECTION_KEEP: usize = 4;
@@ -19,7 +19,7 @@ const PROMPT_OTHER_SECTION_KEEP: usize = 4;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum StoryMemorySectionKind {
     Scene,
-    Chapter,
+    Bundle,
     Rewrite,
     WorldExpansion,
     Other,
@@ -199,7 +199,7 @@ fn parse_story_memory_sections(story_memory: &str) -> (String, Vec<StoryMemorySe
 
 fn select_story_memory_sections(sections: &[StoryMemorySection]) -> Vec<usize> {
     let mut scene_count = 0usize;
-    let mut chapter_count = 0usize;
+    let mut bundle_count = 0usize;
     let mut rewrite_count = 0usize;
     let mut world_count = 0usize;
     let mut other_count = 0usize;
@@ -211,8 +211,8 @@ fn select_story_memory_sections(sections: &[StoryMemorySection]) -> Vec<usize> {
                 scene_count += 1;
                 true
             }
-            StoryMemorySectionKind::Chapter if chapter_count < PROMPT_CHAPTER_SECTION_KEEP => {
-                chapter_count += 1;
+            StoryMemorySectionKind::Bundle if bundle_count < PROMPT_BUNDLE_SECTION_KEEP => {
+                bundle_count += 1;
                 true
             }
             StoryMemorySectionKind::Rewrite if rewrite_count < PROMPT_REWRITE_SECTION_KEEP => {
@@ -285,7 +285,7 @@ fn truncate_chars(value: &str, max_chars: usize) -> String {
 fn section_char_limit(kind: StoryMemorySectionKind) -> usize {
     match kind {
         StoryMemorySectionKind::Scene => PROMPT_SCENE_SECTION_LIMIT,
-        StoryMemorySectionKind::Chapter => PROMPT_CHAPTER_SECTION_LIMIT,
+        StoryMemorySectionKind::Bundle => PROMPT_BUNDLE_SECTION_LIMIT,
         StoryMemorySectionKind::Rewrite => PROMPT_REWRITE_SECTION_LIMIT,
         StoryMemorySectionKind::WorldExpansion => PROMPT_WORLD_SECTION_LIMIT,
         StoryMemorySectionKind::Other => PROMPT_OTHER_SECTION_LIMIT,
@@ -296,8 +296,8 @@ impl StoryMemorySection {
     fn kind(&self) -> StoryMemorySectionKind {
         if self.heading.starts_with("Scene ") {
             StoryMemorySectionKind::Scene
-        } else if self.heading.starts_with("Chapter ") {
-            StoryMemorySectionKind::Chapter
+        } else if self.heading.starts_with("Bundle ") {
+            StoryMemorySectionKind::Bundle
         } else if self.heading.starts_with("Rewrite ") {
             StoryMemorySectionKind::Rewrite
         } else if self.heading.starts_with("World Expansion") {
@@ -333,7 +333,7 @@ mod tests {
                 "A lead surfaces, but the cost rises. ".repeat(10),
             ));
         }
-        story.push_str("## Chapter 001: First Descent\n");
+        story.push_str("## Bundle 001: First Descent\n");
         story.push_str(&"Compiled summary. ".repeat(50));
         story.push_str("\n\n## Rewrite scene_001_014\n");
         story.push_str(&"Instruction log. ".repeat(40));

@@ -64,11 +64,11 @@ scene 생성을 시작하기 위한 필수 메타는 다음이다.
 PiuroForge의 기본 집필 단위는 다음 두 가지다.
 
 - `scene`: 기본 생성 단위다. 연재 플랫폼 워크플로에서는 보통 `scene 1개 = 업로드 1회차`로 운용한다.
-- `chapter`: 여러 scene을 묶어 정리하는 내부 manuscript 번들이다. 기본 동작에서는 업로드 단위가 아니다.
+- `bundle`: 여러 scene을 묶어 정리하는 내부 manuscript 번들이다. 기본 동작에서는 업로드 단위가 아니다.
 
 scene 자체에는 manuscript-friendly `short_title`이 추가로 저장되며, scene 파일명 slug는 기본적으로 이 값을 사용한다.
-chapter도 compiled `short_title`을 가지며 chapter 파일명 slug는 이 값을 사용한다.
-기본 chapter drafting 정책은 `chapter_scene_target = 3`이며, 각 chapter 안에서 scene 역할은 `incident -> escalation -> cliffhanger`로 진행된다.
+bundle도 compiled `short_title`을 가지며 bundle 파일명 slug는 이 값을 사용한다.
+기본 bundle drafting 정책은 `bundle_scene_target = 3`이며, 각 bundle 안에서 scene 역할은 `incident -> escalation -> cliffhanger`로 진행된다.
 이 값은 `novel.toml`에서 바꿀 수 있지만, 일반 사용자는 기본값을 유지하는 쪽이 안정적이다.
 디스크의 `story_memory.md`는 전체 이력을 유지하지만, planner/writer/expand-world 프롬프트에는 최근성과 신호가 높은 섹션 위주로 제한된 prompt view를 사용해 장편 누적 시 컨텍스트 폭주를 완화한다.
 
@@ -91,7 +91,7 @@ curl -fsSL https://raw.githubusercontent.com/piuro-works/piuroforge/main/install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/piuro-works/piuroforge/main/install.sh | \
-  PIUROFORGE_VERSION=v1.0.3 bash
+  PIUROFORGE_VERSION=v2.0.0 bash
 ```
 
 설치 스크립트는 현재 플랫폼을 감지하고 GitHub Releases에서 `piuroforge-<target>.tar.gz` 자산을 내려받는다.
@@ -221,7 +221,7 @@ git add .
 git commit -m "Initialize novel workspace"
 ```
 
-`piuroforge init`은 워크스페이스용 `.gitignore`를 생성해서 엔진 내부 상태 파일만 제외하고, scene 초안, compiled chapter 번들, story memory 같은 실제 소설 산출물은 Git에 포함할 수 있게 준비한다.
+`piuroforge init`은 워크스페이스용 `.gitignore`를 생성해서 엔진 내부 상태 파일만 제외하고, scene 초안, compiled bundle 번들, story memory 같은 실제 소설 산출물은 Git에 포함할 수 있게 준비한다.
 처음 실행 시 전역 설정 파일 `~/.config/piuroforge/config.toml`도 없으면 기본값으로 생성된다.
 필수값이 비어 있는 상태로 `init --no-input`을 수행한 경우 워크스페이스는 생성되지만 `next-scene` 전에 `novel.toml`을 채워야 한다.
 
@@ -233,7 +233,7 @@ git commit -m "Initialize novel workspace"
 ├── 01_Brief/
 ├── 02_Draft/
 │   ├── Scenes/
-│   ├── Chapters/
+│   ├── Bundles/
 │   ├── Fragments/
 │   └── Illustrations/
 ├── 03_StoryBible/
@@ -265,7 +265,7 @@ git commit -m "Initialize novel workspace"
 
 Git 확인용으로는 위 바깥 구조와 `novel.toml`을 커밋하고, `.novel/state/`, `.novel/logs/`, `.novel/memory/active_memory.md` 같은 런타임 데이터는 ignore하는 흐름을 권장한다.
 `init`은 루트 `README.md`, 각 주요 섹션 `README.md`, 그리고 `98_Templates/`의 starter template 파일도 함께 생성한다.
-Git을 잘 모르는 사용자라면 전역 설정 `workspace_auto_commit = true` 또는 `PIUROFORGE_WORKSPACE_AUTO_COMMIT=true`로 workspace Git 자동 초기화/자동 커밋을 켤 수 있다. 이 경우 `init`, `next-scene`, `review`, `rewrite`, `approve`, `next-chapter`, `expand-world` 같은 변경 명령 뒤에 workspace repo가 자동으로 commit된다.
+Git을 잘 모르는 사용자라면 전역 설정 `workspace_auto_commit = true` 또는 `PIUROFORGE_WORKSPACE_AUTO_COMMIT=true`로 workspace Git 자동 초기화/자동 커밋을 켤 수 있다. 이 경우 `init`, `next-scene`, `review`, `rewrite`, `approve`, `next-bundle`, `expand-world` 같은 변경 명령 뒤에 workspace repo가 자동으로 commit된다.
 내부 구현은 workspace 제어 엔진과 Codex 소설 생성 backend를 분리했지만, 사용자는 계속 같은 `piuroforge` 명령만 쓰면 된다. backend 분리는 사용자 절차를 늘리기 위한 것이 아니라, 향후 worker/bridge 구조를 숨긴 채 안정성을 높이기 위한 내부 경계다.
 현재 기본 런타임 backend는 `codex_cli` 하나다. 다만 내부 LLM 호출 경계는 `PromptRunner`와 `CliNovelBackend`로 분리되어 있어서, 다른 사람이 Gemini CLI, Claude CLI, Copilot CLI 같은 대체 runner를 추가하더라도 planner/writer/editor/critic orchestration은 재사용할 수 있다. 이런 확장은 사용자 setup flow를 바꾸지 않아야 하며, fake runner 기반 통합 테스트를 함께 추가하는 것을 권장한다.
 
@@ -279,7 +279,7 @@ piuroforge next-scene
 piuroforge review
 piuroforge rewrite scene_001_001 --instruction "대사를 더 날카롭게"
 piuroforge approve scene_001_001
-piuroforge next-chapter
+piuroforge next-bundle
 piuroforge expand-world
 piuroforge memory
 piuroforge show scene_001_001
@@ -339,13 +339,13 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 ## 산출물과 로그
 
 - scene markdown: `<workspace>/02_Draft/Scenes/<scene_id>-<slug>.md` (기본 생성 단위. 연재 플랫폼에서는 보통 업로드 1회차 초안으로 사용한다)
-- chapter markdown: `<workspace>/02_Draft/Chapters/chapter_<chapter>-<slug>.md` (여러 scene을 묶은 내부 manuscript 번들)
+- bundle markdown: `<workspace>/02_Draft/Bundles/bundle_<bundle>-<slug>.md` (여러 scene을 묶은 내부 manuscript 번들)
 - review 결과 JSON: `<workspace>/06_Review/Feedback/<scene_id>.json`
 - rewrite 원본/수정본과 revision record: `<workspace>/06_Review/Revisions/<scene_id>/`
   - revision record에는 `source_review_score`, `post_rewrite_review_score`가 함께 저장된다.
 - scene 생성 로그: `<workspace>/.novel/logs/scene_generation/<scene_id>.json`
 - opt-in prompt 로그: `<workspace>/.novel/logs/llm_prompts/*.json` (`PIUROFORGE_LOG_PROMPTS=true` 또는 전역 `log_prompts = true`일 때만)
-- chapter 생성 시 scene 번호가 1부터 연속인지 검증한다.
+- bundle 생성 시 scene 번호가 1부터 연속인지 검증한다.
 
 ## 환경 변수
 
@@ -383,14 +383,14 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 - scene 생성 로그 저장
 - rewrite 원본/수정본 snapshot 보존
 - review 결과 JSON 저장
-- chapter 컴파일 전 scene 순서 검증
+- bundle 컴파일 전 scene 순서 검증
 - `codex` subprocess 재시도 1회
 - `codex` subprocess timeout 및 hang 방지 강제 종료
 - 최소 smoke test 및 runner retry test
 
 ## 다음 고도화 포인트
 
-- chapter/arc 단위 요약 memory 자동화
+- bundle/arc 단위 요약 memory 자동화
 - 승인 이력 및 diff 로그
 - backend registry와 backend별 doctor/install 가이드 확장
 - command별 더 세분화된 schema_version / error taxonomy

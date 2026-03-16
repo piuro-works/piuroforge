@@ -10,7 +10,7 @@ use crate::codex_runner::CodexRunner;
 use crate::config::NovelSettings;
 use crate::llm_runner::PromptRunner;
 use crate::models::{
-    chapter_role_for, normalize_review_score, review_score_from_issue_count, MemoryBundle,
+    bundle_role_for, normalize_review_score, review_score_from_issue_count, MemoryBundle,
     ReviewIssue, ReviewOutcome, Scene, ScenePlan, StoryState,
 };
 
@@ -29,7 +29,7 @@ pub struct SceneGenerationRequest {
     pub planner_story_foundation: String,
     pub writer_story_foundation: String,
     pub editor_story_foundation: String,
-    pub chapter: u32,
+    pub bundle: u32,
     pub scene_number: u32,
     pub scene_id: String,
     pub allow_dummy_fallback: bool,
@@ -134,7 +134,7 @@ impl CliNovelBackend {
 impl NovelBackend for CliNovelBackend {
     fn generate_scene(&self, request: SceneGenerationRequest) -> Result<SceneGenerationResponse> {
         let mut warnings = Vec::new();
-        let chapter_scene_target = request.novel.chapter_scene_target.max(1);
+        let bundle_scene_target = request.novel.bundle_scene_target.max(1);
 
         let planner = PlannerAgent::new(self.runner.clone());
         let planner_context = AgentContext {
@@ -153,9 +153,9 @@ impl NovelBackend for CliNovelBackend {
         }
         let parsed_plan = parse_scene_plan(
             &planner_run.output,
-            request.chapter,
+            request.bundle,
             request.scene_number,
-            chapter_scene_target,
+            bundle_scene_target,
         )?;
         warnings.extend(parsed_plan.warnings);
         let scene_plan = parsed_plan.plan;
@@ -178,10 +178,10 @@ impl NovelBackend for CliNovelBackend {
 
         let draft_scene = Scene {
             id: request.scene_id,
-            chapter: request.chapter,
+            bundle: request.bundle,
             scene_number: request.scene_number,
             short_title: scene_plan.effective_short_title(),
-            chapter_role: scene_plan.chapter_role.clone(),
+            bundle_role: scene_plan.bundle_role.clone(),
             goal: scene_plan.goal.clone(),
             conflict: scene_plan.conflict.clone(),
             outcome: scene_plan.outcome.clone(),
@@ -352,9 +352,9 @@ impl NovelBackend for CodexNovelBackend {
 
 fn parse_scene_plan(
     raw: &str,
-    chapter: u32,
+    bundle: u32,
     scene_number: u32,
-    chapter_scene_target: u32,
+    bundle_scene_target: u32,
 ) -> Result<ParsedScenePlan> {
     let cleaned = strip_code_fences(raw);
     let mut plan = serde_json::from_str::<ScenePlan>(&cleaned).map_err(|error| {
@@ -364,20 +364,20 @@ fn parse_scene_plan(
         )
     })?;
     let mut warnings = Vec::new();
-    let expected_role = chapter_role_for(scene_number, chapter_scene_target);
+    let expected_role = bundle_role_for(scene_number, bundle_scene_target);
 
-    if plan.chapter == 0 {
-        plan.chapter = chapter;
+    if plan.bundle == 0 {
+        plan.bundle = bundle;
         warnings.push(format!(
-            "planner omitted chapter; using expected chapter {}.",
-            chapter
+            "planner omitted bundle; using expected bundle {}.",
+            bundle
         ));
-    } else if plan.chapter != chapter {
+    } else if plan.bundle != bundle {
         warnings.push(format!(
-            "planner returned chapter {} but current chapter is {}; using current chapter.",
-            plan.chapter, chapter
+            "planner returned bundle {} but current bundle is {}; using current bundle.",
+            plan.bundle, bundle
         ));
-        plan.chapter = chapter;
+        plan.bundle = bundle;
     }
 
     if plan.scene_number == 0 {
@@ -407,24 +407,24 @@ fn parse_scene_plan(
         bail!("planner returned scene plan without outcome");
     }
 
-    let returned_role = plan.chapter_role.trim();
+    let returned_role = plan.bundle_role.trim();
     if returned_role.is_empty() {
         warnings.push(format!(
-            "planner omitted chapter_role; using expected `{expected_role}`."
+            "planner omitted bundle_role; using expected `{expected_role}`."
         ));
-        plan.chapter_role = expected_role;
-    } else if !is_valid_chapter_role(returned_role) {
+        plan.bundle_role = expected_role;
+    } else if !is_valid_bundle_role(returned_role) {
         warnings.push(format!(
-            "planner returned unsupported chapter_role `{returned_role}`; using expected `{expected_role}`."
+            "planner returned unsupported bundle_role `{returned_role}`; using expected `{expected_role}`."
         ));
-        plan.chapter_role = expected_role;
+        plan.bundle_role = expected_role;
     } else if returned_role != expected_role {
         warnings.push(format!(
-            "planner returned chapter_role `{returned_role}` but chapter policy expects `{expected_role}`; using expected role."
+            "planner returned bundle_role `{returned_role}` but bundle policy expects `{expected_role}`; using expected role."
         ));
-        plan.chapter_role = expected_role;
+        plan.bundle_role = expected_role;
     } else {
-        plan.chapter_role = returned_role.to_string();
+        plan.bundle_role = returned_role.to_string();
     }
 
     plan.short_title = plan.short_title.trim().to_string();
@@ -528,7 +528,7 @@ fn validate_review_issues(issues: Vec<ReviewIssue>) -> Result<ParsedReviewOutcom
     })
 }
 
-fn is_valid_chapter_role(value: &str) -> bool {
+fn is_valid_bundle_role(value: &str) -> bool {
     matches!(value, "incident" | "escalation" | "cliffhanger")
 }
 
@@ -605,7 +605,7 @@ mod tests {
     #[test]
     fn parse_scene_plan_rejects_missing_required_fields() {
         let error = parse_scene_plan(
-            r#"{"chapter":1,"scene_number":1,"chapter_role":"incident","goal":"","conflict":"A","outcome":"B"}"#,
+            r#"{"bundle":1,"scene_number":1,"bundle_role":"incident","goal":"","conflict":"A","outcome":"B"}"#,
             1,
             1,
             3,
@@ -621,23 +621,23 @@ mod tests {
     #[test]
     fn parse_scene_plan_normalizes_mismatched_role_with_warning() -> Result<()> {
         let parsed = parse_scene_plan(
-            r#"{"chapter":99,"scene_number":3,"short_title":"Wrong Turn","chapter_role":"incident","goal":"Push through the vault.","conflict":"The guard recognizes her.","outcome":"She gets the ledger but trips the alarm."}"#,
+            r#"{"bundle":99,"scene_number":3,"short_title":"Wrong Turn","bundle_role":"incident","goal":"Push through the vault.","conflict":"The guard recognizes her.","outcome":"She gets the ledger but trips the alarm."}"#,
             1,
             2,
             3,
         )?;
 
-        assert_eq!(parsed.plan.chapter, 1);
+        assert_eq!(parsed.plan.bundle, 1);
         assert_eq!(parsed.plan.scene_number, 2);
-        assert_eq!(parsed.plan.chapter_role, "escalation");
+        assert_eq!(parsed.plan.bundle_role, "escalation");
         assert!(parsed
             .warnings
             .iter()
-            .any(|warning| warning.contains("using current chapter")));
+            .any(|warning| warning.contains("using current bundle")));
         assert!(parsed
             .warnings
             .iter()
-            .any(|warning| warning.contains("chapter policy expects `escalation`")));
+            .any(|warning| warning.contains("bundle policy expects `escalation`")));
         Ok(())
     }
 
@@ -689,7 +689,7 @@ mod tests {
         let backend = CliNovelBackend::new(Arc::new(FixturePromptRunner::from_pairs(&[
             (
                 "planner",
-                r#"{"chapter":1,"scene_number":1,"short_title":"Signal at the Gate","chapter_role":"incident","goal":"The investigator confirms the missing courier route.","conflict":"A clerk refuses access without a dead supervisor's code.","outcome":"The route is found, but the code points to a sealed dock ledger."}"#,
+                r#"{"bundle":1,"scene_number":1,"short_title":"Signal at the Gate","bundle_role":"incident","goal":"The investigator confirms the missing courier route.","conflict":"A clerk refuses access without a dead supervisor's code.","outcome":"The route is found, but the code points to a sealed dock ledger."}"#,
             ),
             (
                 "writer",
@@ -722,7 +722,7 @@ mod tests {
                 .to_string(),
             protagonist_name: "Yunseo".to_string(),
             language: "ko".to_string(),
-            chapter_scene_target: 3,
+            bundle_scene_target: 3,
             ..NovelSettings::default()
         };
         let memory = MemoryBundle {
@@ -738,7 +738,7 @@ mod tests {
             planner_story_foundation: "Plot foundation".to_string(),
             writer_story_foundation: "Writer foundation".to_string(),
             editor_story_foundation: "Editor foundation".to_string(),
-            chapter: 1,
+            bundle: 1,
             scene_number: 1,
             scene_id: "scene_001_001".to_string(),
             allow_dummy_fallback: false,
@@ -799,14 +799,14 @@ mod tests {
                     premise: "An investigator follows edited records.".to_string(),
                     protagonist_name: "Yunseo".to_string(),
                     language: "ko".to_string(),
-                    chapter_scene_target: 3,
+                    bundle_scene_target: 3,
                     ..NovelSettings::default()
                 },
                 memory: MemoryBundle::default(),
                 planner_story_foundation: "Plot foundation".to_string(),
                 writer_story_foundation: "Writer foundation".to_string(),
                 editor_story_foundation: "Editor foundation".to_string(),
-                chapter: 1,
+                bundle: 1,
                 scene_number: 1,
                 scene_id: "scene_001_001".to_string(),
                 allow_dummy_fallback: false,
@@ -835,17 +835,17 @@ mod tests {
                     premise: "An investigator follows edited records.".to_string(),
                     protagonist_name: "Yunseo".to_string(),
                     language: "ko".to_string(),
-                    chapter_scene_target: 3,
+                    bundle_scene_target: 3,
                     ..NovelSettings::default()
                 },
                 memory: MemoryBundle::default(),
                 critic_story_foundation: "Critic foundation".to_string(),
                 scene: Scene {
                     id: "scene_001_001".to_string(),
-                    chapter: 1,
+                    bundle: 1,
                     scene_number: 1,
                     short_title: "Signal at the Gate".to_string(),
-                    chapter_role: "incident".to_string(),
+                    bundle_role: "incident".to_string(),
                     goal: "Confirm the route.".to_string(),
                     conflict: "The clerk refuses access.".to_string(),
                     outcome: "The route points to a sealed ledger.".to_string(),

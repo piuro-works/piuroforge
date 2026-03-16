@@ -5,7 +5,7 @@ Novel title: {{title}}
 Tone: {{tone}}
 Premise: {{premise}}
 Protagonist: {{protagonist_name}}
-Chapter role: {{chapter_role}}
+Bundle role: {{bundle_role}}
 Instruction: {{instruction}}
 Goal: {{goal}}
 Conflict: {{conflict}}
@@ -17,7 +17,7 @@ Editing priorities:
 - preserve concrete action beats around dialogue
 - remove obvious word repetition and repetitive sentence openings
 - keep each speaker's voice distinct and consistent with the character bible
-- keep the scene aligned with its chapter role: incident, escalation, or cliffhanger
+- keep the scene aligned with its bundle role: incident, escalation, or cliffhanger
 - do not flatten the prose into one uniform sentence length
 
 Story foundation:

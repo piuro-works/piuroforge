@@ -91,7 +91,7 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
             args: vec!["SCENE_ID"],
         },
         CommandCapability {
-            name: "next-chapter",
+            name: "next-bundle",
             workspace_required: true,
             mutates_workspace: true,
             requires_codex: false,

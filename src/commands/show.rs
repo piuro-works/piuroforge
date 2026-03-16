@@ -11,8 +11,8 @@ pub fn run(engine: &NovelEngine, scene_id: &str) -> Result<CommandOutput> {
             .detail("scene_id", scene.id.clone())
             .detail("short_title", scene.effective_short_title())
             .detail(
-                "chapter_role",
-                scene.effective_chapter_role(engine.chapter_scene_target()),
+                "bundle_role",
+                scene.effective_bundle_role(engine.bundle_scene_target()),
             )
             .detail("goal", scene.goal.clone())
             .detail("conflict", scene.conflict.clone())

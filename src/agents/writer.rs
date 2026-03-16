@@ -22,15 +22,15 @@ impl WriterAgent {
             .ok_or_else(|| anyhow!("writer requires a scene plan"))?;
 
         let scene_id = plan.scene_id();
-        let chapter_role = plan.effective_chapter_role(context.novel.chapter_scene_target);
+        let bundle_role = plan.effective_bundle_role(context.novel.bundle_scene_target);
         Ok(render_template(
             WRITER_TEMPLATE,
             &[
                 ("scene_id", scene_id.as_str()),
-                ("chapter_role", chapter_role.as_str()),
+                ("bundle_role", bundle_role.as_str()),
                 (
-                    "chapter_scene_target",
-                    &context.novel.chapter_scene_target.to_string(),
+                    "bundle_scene_target",
+                    &context.novel.bundle_scene_target.to_string(),
                 ),
                 ("title", context.novel.title.as_str()),
                 ("genre", context.novel.genre.as_str()),

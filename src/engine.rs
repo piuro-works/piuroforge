@@ -21,7 +21,7 @@ use crate::story_foundation::{
     load_story_foundation, StoryFoundationBundle, StoryFoundationStatus,
 };
 use crate::utils::files::{ensure_dir, list_markdown_files, read_string, write_string};
-use crate::utils::markdown::{parse_scene, render_chapter, render_scene};
+use crate::utils::markdown::{parse_scene, render_bundle, render_scene};
 use crate::workspace_git::{WorkspaceGit, WorkspaceGitOutcome};
 use crate::workspace_scaffold::{scaffold_files, SCAFFOLD_DIRS};
 
@@ -103,7 +103,7 @@ impl NovelEngine {
         let mut state = self.prepare_generation_state()?;
         let memory = self.memory_manager.load_prompt_bundle()?;
         let foundation = self.load_story_foundation_bundle()?;
-        let (chapter, scene_number, scene_id) = self.state_manager.next_scene_identity(&state);
+        let (bundle, scene_number, scene_id) = self.state_manager.next_scene_identity(&state);
         let generated = self.backend.generate_scene(SceneGenerationRequest {
             state: state.clone(),
             novel: self.config.novel_settings.clone(),
@@ -111,7 +111,7 @@ impl NovelEngine {
             planner_story_foundation: foundation.views.planner.clone(),
             writer_story_foundation: foundation.views.writer.clone(),
             editor_story_foundation: foundation.views.editor.clone(),
-            chapter,
+            bundle,
             scene_number,
             scene_id,
             allow_dummy_fallback: self.config.allow_dummy_fallback,
@@ -274,34 +274,34 @@ impl NovelEngine {
         Ok(())
     }
 
-    pub fn generate_next_chapter(&self) -> Result<PathBuf> {
+    pub fn generate_next_bundle(&self) -> Result<PathBuf> {
         self.init_project()?;
 
         let mut state = self.state_manager.load_state()?;
-        let (chapter, scenes, should_advance_state) =
-            self.resolve_chapter_compilation_target(&state)?;
-        self.validate_scene_sequence(chapter, &scenes)?;
-        self.validate_chapter_scene_target(chapter, &scenes)?;
+        let (bundle, scenes, should_advance_state) =
+            self.resolve_bundle_compilation_target(&state)?;
+        self.validate_scene_sequence(bundle, &scenes)?;
+        self.validate_bundle_scene_target(bundle, &scenes)?;
 
-        let chapter_short_title = self.derive_chapter_short_title(chapter, &scenes);
-        let content = render_chapter(chapter, &chapter_short_title, &scenes);
-        let chapter_path = self.chapter_path(chapter, &chapter_short_title);
-        write_string(&chapter_path, &content)?;
+        let bundle_short_title = self.derive_bundle_short_title(bundle, &scenes);
+        let content = render_bundle(bundle, &bundle_short_title, &scenes);
+        let bundle_path = self.bundle_path(bundle, &bundle_short_title);
+        write_string(&bundle_path, &content)?;
 
         self.memory_manager.append_story_memory(&format!(
-            "## Chapter {:03}: {}\n- Compiled {} scene(s) into {}\n",
-            chapter,
-            chapter_short_title,
+            "## Bundle {:03}: {}\n- Compiled {} scene(s) into {}\n",
+            bundle,
+            bundle_short_title,
             scenes.len(),
-            self.workspace_relative_path(&chapter_path)
+            self.workspace_relative_path(&bundle_path)
         ))?;
 
         if should_advance_state {
-            self.state_manager.begin_next_chapter(&mut state);
+            self.state_manager.begin_next_bundle(&mut state);
             self.state_manager.save_state(&state)?;
         }
 
-        Ok(chapter_path)
+        Ok(bundle_path)
     }
 
     pub fn expand_world(&self) -> Result<OperationResult<String>> {
@@ -378,8 +378,8 @@ impl NovelEngine {
         Ok(self.load_story_foundation_bundle()?.status)
     }
 
-    pub fn chapter_scene_target(&self) -> u32 {
-        self.config.novel_settings.chapter_scene_target.max(1)
+    pub fn bundle_scene_target(&self) -> u32 {
+        self.config.novel_settings.bundle_scene_target.max(1)
     }
 
     pub fn serialized_workflow_enabled(&self) -> bool {
@@ -405,13 +405,13 @@ impl NovelEngine {
             .join(format!("{scene_id}.json"))
     }
 
-    pub fn chapter_short_title(&self, chapter: u32) -> Result<Option<String>> {
-        let scenes = self.load_scenes_for_chapter(chapter)?;
+    pub fn bundle_short_title(&self, bundle: u32) -> Result<Option<String>> {
+        let scenes = self.load_scenes_for_bundle(bundle)?;
         if scenes.is_empty() {
             return Ok(None);
         }
 
-        Ok(Some(self.derive_chapter_short_title(chapter, &scenes)))
+        Ok(Some(self.derive_bundle_short_title(bundle, &scenes)))
     }
 
     pub fn review_report_path(&self, scene_id: &str) -> PathBuf {
@@ -641,22 +641,22 @@ impl NovelEngine {
         None
     }
 
-    fn chapter_path(&self, chapter: u32, short_title: &str) -> PathBuf {
+    fn bundle_path(&self, bundle: u32, short_title: &str) -> PathBuf {
         let slug = slug_fragment(short_title);
         if slug.is_empty() {
             return self
                 .config
-                .chapters_dir
-                .join(format!("chapter_{chapter:03}.md"));
+                .bundles_dir
+                .join(format!("bundle_{bundle:03}.md"));
         }
 
         self.config
-            .chapters_dir
-            .join(format!("chapter_{chapter:03}-{slug}.md"))
+            .bundles_dir
+            .join(format!("bundle_{bundle:03}-{slug}.md"))
     }
 
-    fn load_scenes_for_chapter(&self, chapter: u32) -> Result<Vec<Scene>> {
-        let prefix = format!("scene_{:03}_", chapter);
+    fn load_scenes_for_bundle(&self, bundle: u32) -> Result<Vec<Scene>> {
+        let prefix = format!("scene_{:03}_", bundle);
         let mut scenes = BTreeMap::new();
 
         for dir in [self.legacy_scenes_dir(), self.config.scenes_dir.clone()] {
@@ -683,13 +683,13 @@ impl NovelEngine {
         Ok(scenes)
     }
 
-    fn validate_scene_sequence(&self, chapter: u32, scenes: &[Scene]) -> Result<()> {
+    fn validate_scene_sequence(&self, bundle: u32, scenes: &[Scene]) -> Result<()> {
         let mut expected = 1u32;
         for scene in scenes {
             if scene.scene_number != expected {
                 return Err(anyhow!(
-                    "chapter {:03} scene order is invalid: expected scene {:03} but found {}",
-                    chapter,
+                    "bundle {:03} scene order is invalid: expected scene {:03} but found {}",
+                    bundle,
                     expected,
                     scene.id
                 ));
@@ -699,12 +699,12 @@ impl NovelEngine {
         Ok(())
     }
 
-    fn validate_chapter_scene_target(&self, chapter: u32, scenes: &[Scene]) -> Result<()> {
-        let target = self.chapter_scene_target() as usize;
+    fn validate_bundle_scene_target(&self, bundle: u32, scenes: &[Scene]) -> Result<()> {
+        let target = self.bundle_scene_target() as usize;
         if scenes.len() != target {
             return Err(anyhow!(
-                "chapter scene target not reached for chapter {:03}: expected {} scene(s) but found {}",
-                chapter,
+                "bundle scene target not reached for bundle {:03}: expected {} scene(s) but found {}",
+                bundle,
                 target,
                 scenes.len()
             ));
@@ -797,13 +797,13 @@ impl NovelEngine {
 
     fn render_active_memory(&self, state: &StoryState, scene: &Scene) -> String {
         format!(
-            "# Active Memory\n\n- Arc: {}\n- Chapter: {}\n- Scene: {}\n- Scene ID: {}\n- Short Title: {}\n- Chapter Role: {}\n- Stage: {}\n- Goal: {}\n- Conflict: {}\n- Outcome: {}\n",
+            "# Active Memory\n\n- Arc: {}\n- Bundle: {}\n- Scene: {}\n- Scene ID: {}\n- Short Title: {}\n- Bundle Role: {}\n- Stage: {}\n- Goal: {}\n- Conflict: {}\n- Outcome: {}\n",
             state.current_arc,
-            scene.chapter,
+            scene.bundle,
             scene.scene_number,
             scene.id.as_str(),
             scene.effective_short_title(),
-            scene.effective_chapter_role(self.chapter_scene_target()),
+            scene.effective_bundle_role(self.bundle_scene_target()),
             state.stage.as_str(),
             scene.goal.as_str(),
             scene.conflict.as_str(),
@@ -813,10 +813,10 @@ impl NovelEngine {
 
     fn render_story_memory_entry(&self, scene: &Scene) -> String {
         format!(
-            "## Scene {}: {}\n- Chapter Role: {}\n- Goal: {}\n- Conflict: {}\n- Outcome: {}\n- Status: {}\n",
+            "## Scene {}: {}\n- Bundle Role: {}\n- Goal: {}\n- Conflict: {}\n- Outcome: {}\n- Status: {}\n",
             scene.id.as_str(),
             scene.effective_short_title(),
-            scene.effective_chapter_role(self.chapter_scene_target()),
+            scene.effective_bundle_role(self.bundle_scene_target()),
             scene.goal.as_str(),
             scene.conflict.as_str(),
             scene.outcome.as_str(),
@@ -835,14 +835,14 @@ impl NovelEngine {
         }
 
         let mut state = self.state_manager.load_state()?;
-        let chapter = state.current_chapter;
-        let scenes = self.load_scenes_for_chapter(chapter)?;
-        let target = self.chapter_scene_target() as usize;
+        let bundle = state.current_bundle;
+        let scenes = self.load_scenes_for_bundle(bundle)?;
+        let target = self.bundle_scene_target() as usize;
         if scenes.len() >= target {
             if !self.serialized_workflow_enabled() {
                 return Err(anyhow!(
-                    "chapter scene limit reached for chapter {:03}: target is {} scene(s). compile the chapter before drafting more",
-                    chapter,
+                    "bundle scene limit reached for bundle {:03}: target is {} scene(s). compile the bundle before drafting more",
+                    bundle,
                     target
                 ));
             }
@@ -853,56 +853,56 @@ impl NovelEngine {
                     .as_deref()
                     .unwrap_or("the current scene");
                 return Err(anyhow!(
-                    "serialized workflow reached the internal chapter boundary for chapter {:03}. review and approve {} before drafting the next scene",
-                    chapter,
+                    "serialized workflow reached the internal bundle boundary for bundle {:03}. review and approve {} before drafting the next scene",
+                    bundle,
                     current_scene
                 ));
             }
 
-            self.state_manager.begin_next_chapter(&mut state);
+            self.state_manager.begin_next_bundle(&mut state);
             self.state_manager.save_state(&state)?;
         }
 
         Ok(state)
     }
 
-    fn resolve_chapter_compilation_target(
+    fn resolve_bundle_compilation_target(
         &self,
         state: &StoryState,
     ) -> Result<(u32, Vec<Scene>, bool)> {
-        let chapter = state.current_chapter;
-        let scenes = self.load_scenes_for_chapter(chapter)?;
+        let bundle = state.current_bundle;
+        let scenes = self.load_scenes_for_bundle(bundle)?;
         if self.serialized_workflow_enabled() {
-            let target = self.chapter_scene_target() as usize;
+            let target = self.bundle_scene_target() as usize;
             if scenes.len() >= target {
-                return Ok((chapter, scenes, false));
+                return Ok((bundle, scenes, false));
             }
 
-            if chapter > 1 {
-                let previous_chapter = chapter - 1;
-                let previous_scenes = self.load_scenes_for_chapter(previous_chapter)?;
+            if bundle > 1 {
+                let previous_bundle = bundle - 1;
+                let previous_scenes = self.load_scenes_for_bundle(previous_bundle)?;
                 if !previous_scenes.is_empty() {
-                    return Ok((previous_chapter, previous_scenes, false));
+                    return Ok((previous_bundle, previous_scenes, false));
                 }
             }
 
             if !scenes.is_empty() {
-                return Ok((chapter, scenes, false));
+                return Ok((bundle, scenes, false));
             }
         } else if !scenes.is_empty() {
-            return Ok((chapter, scenes, true));
+            return Ok((bundle, scenes, true));
         }
 
-        Err(anyhow!("no scenes found for chapter {:03}", chapter))
+        Err(anyhow!("no scenes found for bundle {:03}", bundle))
     }
 
-    fn derive_chapter_short_title(&self, chapter: u32, scenes: &[Scene]) -> String {
+    fn derive_bundle_short_title(&self, bundle: u32, scenes: &[Scene]) -> String {
         let Some(first) = scenes.first() else {
-            return format!("Chapter {:03}", chapter);
+            return format!("Bundle {:03}", bundle);
         };
 
         let Some(last) = scenes.last() else {
-            return format!("Chapter {:03}", chapter);
+            return format!("Bundle {:03}", bundle);
         };
 
         let first_title = first.effective_short_title();

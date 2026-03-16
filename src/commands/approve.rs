@@ -20,7 +20,7 @@ pub fn run(engine: &NovelEngine, scene_id: &str) -> Result<CommandOutput> {
     .next_step(super::workspace_command(engine, "next-scene"));
 
     if !engine.serialized_workflow_enabled() {
-        output = output.next_step(super::workspace_command(engine, "next-chapter"));
+        output = output.next_step(super::workspace_command(engine, "next-bundle"));
     }
 
     Ok(super::finalize_workspace_change(
