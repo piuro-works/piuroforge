@@ -61,9 +61,14 @@ scene 생성을 시작하기 위한 필수 메타는 다음이다.
 - `protagonist_name`
 - `language`
 
+PiuroForge의 기본 집필 단위는 다음 두 가지다.
+
+- `scene`: 기본 생성 단위다. 연재 플랫폼 워크플로에서는 보통 `scene 1개 = 업로드 1회차`로 운용한다.
+- `chapter`: 여러 scene을 묶어 정리하는 내부 manuscript 번들이다. 기본 동작에서는 업로드 단위가 아니다.
+
 scene 자체에는 manuscript-friendly `short_title`이 추가로 저장되며, scene 파일명 slug는 기본적으로 이 값을 사용한다.
 chapter도 compiled `short_title`을 가지며 chapter 파일명 slug는 이 값을 사용한다.
-기본 chapter drafting 정책은 `chapter_scene_target = 3`이며, scene 역할은 `incident -> escalation -> cliffhanger`로 진행된다.
+기본 chapter drafting 정책은 `chapter_scene_target = 3`이며, 각 chapter 안에서 scene 역할은 `incident -> escalation -> cliffhanger`로 진행된다.
 이 값은 `novel.toml`에서 바꿀 수 있지만, 일반 사용자는 기본값을 유지하는 쪽이 안정적이다.
 디스크의 `story_memory.md`는 전체 이력을 유지하지만, planner/writer/expand-world 프롬프트에는 최근성과 신호가 높은 섹션 위주로 제한된 prompt view를 사용해 장편 누적 시 컨텍스트 폭주를 완화한다.
 
@@ -216,7 +221,7 @@ git add .
 git commit -m "Initialize novel workspace"
 ```
 
-`piuroforge init`은 워크스페이스용 `.gitignore`를 생성해서 엔진 내부 상태 파일만 제외하고, scene/chapter/story memory 같은 실제 소설 산출물은 Git에 포함할 수 있게 준비한다.
+`piuroforge init`은 워크스페이스용 `.gitignore`를 생성해서 엔진 내부 상태 파일만 제외하고, scene 초안, compiled chapter 번들, story memory 같은 실제 소설 산출물은 Git에 포함할 수 있게 준비한다.
 처음 실행 시 전역 설정 파일 `~/.config/piuroforge/config.toml`도 없으면 기본값으로 생성된다.
 필수값이 비어 있는 상태로 `init --no-input`을 수행한 경우 워크스페이스는 생성되지만 `next-scene` 전에 `novel.toml`을 채워야 한다.
 
@@ -333,8 +338,8 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 
 ## 산출물과 로그
 
-- scene markdown: `<workspace>/02_Draft/Scenes/<scene_id>-<slug>.md` (slug는 scene의 `short_title` 기준, 만들 수 없으면 `<scene_id>.md`)
-- chapter markdown: `<workspace>/02_Draft/Chapters/chapter_<chapter>-<slug>.md` (slug는 compiled chapter `short_title` 기준, 만들 수 없으면 `chapter_<chapter>.md`)
+- scene markdown: `<workspace>/02_Draft/Scenes/<scene_id>-<slug>.md` (기본 생성 단위. 연재 플랫폼에서는 보통 업로드 1회차 초안으로 사용한다)
+- chapter markdown: `<workspace>/02_Draft/Chapters/chapter_<chapter>-<slug>.md` (여러 scene을 묶은 내부 manuscript 번들)
 - review 결과 JSON: `<workspace>/06_Review/Feedback/<scene_id>.json`
 - rewrite 원본/수정본과 revision record: `<workspace>/06_Review/Revisions/<scene_id>/`
   - revision record에는 `source_review_score`, `post_rewrite_review_score`가 함께 저장된다.

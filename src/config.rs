@@ -165,7 +165,9 @@ default_language = {default_language:?}\n\
             "# PiuroForge novel workspace settings\n\
 #\n\
 # Writing policy defaults:\n\
-# - chapter_scene_target = 3 means each chapter should usually draft as incident -> escalation -> cliffhanger\n\
+# - scene is the primary drafting unit; serialized workflows often treat one scene as one upload episode\n\
+# - serialized_workflow = true keeps the day-to-day loop scene-first and rolls internal chapter boundaries automatically after approval\n\
+# - chapter_scene_target = 3 means each internal chapter should usually draft as incident -> escalation -> cliffhanger\n\
 # - Fill the story bible before serious drafting so planner and writer have real canon to follow\n\
 \n",
         );
@@ -181,6 +183,10 @@ default_language = {default_language:?}\n\
         rendered.push_str(&format!(
             "protagonist_name = {:?}\n",
             self.novel_settings.protagonist_name
+        ));
+        rendered.push_str(&format!(
+            "serialized_workflow = {}\n",
+            self.novel_settings.serialized_workflow
         ));
         rendered.push_str(&format!(
             "chapter_scene_target = {}\n",
@@ -246,6 +252,8 @@ pub struct NovelSettings {
     pub premise: String,
     #[serde(default)]
     pub protagonist_name: String,
+    #[serde(default = "default_serialized_workflow")]
+    pub serialized_workflow: bool,
     #[serde(default = "default_chapter_scene_target")]
     pub chapter_scene_target: u32,
 }
@@ -261,6 +269,7 @@ impl Default for NovelSettings {
             tone: default_tone(),
             premise: String::new(),
             protagonist_name: String::new(),
+            serialized_workflow: default_serialized_workflow(),
             chapter_scene_target: default_chapter_scene_target(),
         }
     }
@@ -291,6 +300,10 @@ impl NovelSettings {
 
         missing
     }
+}
+
+fn default_serialized_workflow() -> bool {
+    false
 }
 
 fn default_chapter_scene_target() -> u32 {

@@ -99,7 +99,7 @@ Examples:
     name = "piuroforge",
     version,
     about = "PiuroForge CLI novel engine for one workspace = one novel.",
-    long_about = "PiuroForge creates one novel workspace, then generates, reviews, rewrites, approves, and compiles scenes from the terminal. Use `--format json` when another LLM agent needs stable, machine-readable output.",
+    long_about = "PiuroForge creates one novel workspace, then generates, reviews, rewrites, approves, and compiles scenes from the terminal. `scene` is the primary drafting unit, and serialized workflows often treat one scene as one upload episode. `chapter` compiles multiple scenes into an internal manuscript bundle. Use `--format json` when another LLM agent needs stable, machine-readable output.",
     after_long_help = CLI_AFTER_HELP
 )]
 struct Cli {
@@ -152,7 +152,7 @@ enum NovelCommand {
     )]
     Capabilities,
     #[command(
-        about = "Generate the next scene by running planner, writer, and editor.",
+        about = "Generate the next scene draft. In serialized workflows this often means the next upload-sized episode draft.",
         after_long_help = NEXT_SCENE_AFTER_HELP
     )]
     NextScene,
@@ -176,7 +176,7 @@ enum NovelCommand {
     )]
     Approve { scene_id: String },
     #[command(
-        about = "Compile the current chapter markdown after validating scene order.",
+        about = "Compile the current chapter markdown by bundling the chapter's scenes after validating scene order.",
         after_long_help = NEXT_CHAPTER_AFTER_HELP
     )]
     NextChapter,

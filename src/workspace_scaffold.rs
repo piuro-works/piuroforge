@@ -118,18 +118,19 @@ This workspace separates human-facing manuscript files from PiuroForge runtime d
 1. Open a terminal once and run `codex login`.\n\
 2. Run `piuroforge doctor` in this workspace before the first real scene.\n\
 3. Before the first serious scene, fill at least one project brief, one plot note, one character or world note, and one style/tone guide if possible.\n\
-4. Keep the default chapter rhythm simple at first: incident -> escalation -> cliffhanger.\n\
-5. If Doctor says ready, your PiuroForge setup is finished. You can move on to `piuroforge next-scene`.\n\
-6. Open `~/.config/piuroforge/config.toml` if you want to review your PiuroForge settings.\n\
-7. Leave `allow_dummy_fallback = false` for real drafting. Turn it on only if you intentionally want placeholder text while testing the folder workflow.\n\
-8. If you want automatic Git history for this novel workspace, turn on `workspace_auto_commit = true` in the same config file.\n\n\
+4. Treat `scene` as the primary draft unit. In serialized workflows, one scene usually maps to one upload episode.\n\
+5. Keep the default scene rhythm inside each chapter simple: incident -> escalation -> cliffhanger.\n\
+6. If Doctor says ready, your PiuroForge setup is finished. You can move on to `piuroforge next-scene`.\n\
+7. Open `~/.config/piuroforge/config.toml` if you want to review your PiuroForge settings.\n\
+8. Leave `allow_dummy_fallback = false` for real drafting. Turn it on only if you intentionally want placeholder text while testing the folder workflow.\n\
+9. If you want automatic Git history for this novel workspace, turn on `workspace_auto_commit = true` in the same config file.\n\n\
 If `next-scene` fails with `codex_unavailable`, that usually means either `codex login` is not finished yet or this machine cannot reach the Codex service because of internet, DNS, VPN, or proxy issues.\n\n\
 If you run PiuroForge through another assistant, IDE agent, or sandboxed tool, that host may still ask for its own approval prompts. Those prompts are outside PiuroForge.\n\n\
 ## Human Folders\n\n\
 - `00_Inbox/`: raw captures, scraps, and external notes\n\
 - `01_Brief/`: briefs, pitches, and project framing docs\n\
-- `02_Draft/Scenes/`: scene drafts tracked in the novel repo\n\
-- `02_Draft/Chapters/`: compiled chapter drafts tracked in the novel repo\n\
+- `02_Draft/Scenes/`: primary draft units tracked in the novel repo; serialized workflows often use one scene per upload episode\n\
+- `02_Draft/Chapters/`: compiled internal bundles of multiple scenes tracked in the novel repo\n\
 - `02_Draft/Fragments/`: loose fragments and salvageable prose\n\
 - `02_Draft/Illustrations/`: art references and illustration notes\n\
 - `03_StoryBible/`: characters, world, rules, timeline, and plot docs\n\
@@ -183,8 +184,8 @@ const DRAFT_README: &str = "\
 
 Human-facing manuscript work lives here.
 
-- `Scenes/`: atomic scene files generated or revised during drafting
-- `Chapters/`: chapter-level compiled manuscripts
+- `Scenes/`: atomic scene files generated or revised during drafting; in many serialized workflows one scene maps to one upload episode
+- `Chapters/`: compiled internal manuscripts that bundle multiple scenes
 - `Fragments/`: salvageable prose blocks, cut passages, alternates
 - `Illustrations/`: prompts, notes, or references for art packages
 
@@ -192,7 +193,7 @@ Generated scene naming:
 - `scene_001_001-securing-the-lead.md`
 - keep the stable scene id at the front so CLI commands can still target `scene_001_001`
 
-Default chapter rhythm:
+Default scene rhythm inside each chapter:
 - scene 1 = incident
 - scene 2 = escalation
 - scene 3 = cliffhanger

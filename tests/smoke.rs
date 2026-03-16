@@ -187,6 +187,99 @@ fn generate_next_scene_stops_after_chapter_scene_target() -> Result<()> {
 }
 
 #[test]
+fn serialized_workflow_auto_advances_internal_chapter_after_approval() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let mut config = Config::with_global_config_dir(workspace.clone(), global_dir)?;
+    config.novel_settings.genre = "Mystery".to_string();
+    config.novel_settings.tone = "Focused, cinematic, character-driven".to_string();
+    config.novel_settings.premise =
+        "A damaged investigator chases a missing sibling through a city built on edited memories."
+            .to_string();
+    config.novel_settings.protagonist_name = "Yunseo".to_string();
+    config.novel_settings.serialized_workflow = true;
+    config.allow_dummy_fallback = true;
+    config.global_settings.allow_dummy_fallback = true;
+    config.codex_command = "codex-command-for-tests-that-does-not-exist".to_string();
+    config.global_settings.codex_command =
+        "codex-command-for-tests-that-does-not-exist".to_string();
+    let engine = NovelEngine::new(config)?;
+
+    engine.init_project()?;
+    let first = engine.generate_next_scene()?.value;
+    let second = engine.generate_next_scene()?.value;
+    let third = engine.generate_next_scene()?.value;
+    assert_eq!(third.id, "scene_001_003");
+
+    let error = engine
+        .generate_next_scene()
+        .expect_err("expected approval gate at serialized boundary");
+    assert!(error
+        .to_string()
+        .contains("review and approve scene_001_003 before drafting the next scene"));
+
+    engine.approve_scene(&first.id)?;
+    engine.approve_scene(&second.id)?;
+    engine.approve_scene(&third.id)?;
+
+    let fourth = engine.generate_next_scene()?.value;
+    assert_eq!(fourth.id, "scene_002_001");
+
+    let state = engine.get_status()?;
+    assert_eq!(state.current_chapter, 2);
+    assert_eq!(state.current_scene, 1);
+
+    Ok(())
+}
+
+#[test]
+fn serialized_workflow_can_compile_previous_completed_chapter_bundle() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let mut config = Config::with_global_config_dir(workspace.clone(), global_dir)?;
+    config.novel_settings.genre = "Mystery".to_string();
+    config.novel_settings.tone = "Focused, cinematic, character-driven".to_string();
+    config.novel_settings.premise =
+        "A damaged investigator chases a missing sibling through a city built on edited memories."
+            .to_string();
+    config.novel_settings.protagonist_name = "Yunseo".to_string();
+    config.novel_settings.serialized_workflow = true;
+    config.allow_dummy_fallback = true;
+    config.global_settings.allow_dummy_fallback = true;
+    config.codex_command = "codex-command-for-tests-that-does-not-exist".to_string();
+    config.global_settings.codex_command =
+        "codex-command-for-tests-that-does-not-exist".to_string();
+    let engine = NovelEngine::new(config)?;
+
+    engine.init_project()?;
+    let first = engine.generate_next_scene()?.value;
+    let second = engine.generate_next_scene()?.value;
+    let third = engine.generate_next_scene()?.value;
+    engine.approve_scene(&first.id)?;
+    engine.approve_scene(&second.id)?;
+    engine.approve_scene(&third.id)?;
+    let fourth = engine.generate_next_scene()?.value;
+    assert_eq!(fourth.id, "scene_002_001");
+
+    let chapter_path = engine.generate_next_chapter()?;
+    assert_eq!(
+        chapter_path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or_default(),
+        "chapter_001-securing-the-lead.md"
+    );
+
+    let state = engine.get_status()?;
+    assert_eq!(state.current_chapter, 2);
+    assert_eq!(state.current_scene, 1);
+
+    Ok(())
+}
+
+#[test]
 fn review_and_rewrite_persist_artifacts() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");

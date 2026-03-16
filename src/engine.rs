@@ -100,9 +100,7 @@ impl NovelEngine {
 
     pub fn generate_next_scene(&self) -> Result<OperationResult<Scene>> {
         self.init_project()?;
-        self.ensure_generation_ready()?;
-
-        let mut state = self.state_manager.load_state()?;
+        let mut state = self.prepare_generation_state()?;
         let memory = self.memory_manager.load_prompt_bundle()?;
         let foundation = self.load_story_foundation_bundle()?;
         let (chapter, scene_number, scene_id) = self.state_manager.next_scene_identity(&state);
@@ -280,11 +278,8 @@ impl NovelEngine {
         self.init_project()?;
 
         let mut state = self.state_manager.load_state()?;
-        let chapter = state.current_chapter;
-        let scenes = self.load_scenes_for_chapter(chapter)?;
-        if scenes.is_empty() {
-            return Err(anyhow!("no scenes found for chapter {:03}", chapter));
-        }
+        let (chapter, scenes, should_advance_state) =
+            self.resolve_chapter_compilation_target(&state)?;
         self.validate_scene_sequence(chapter, &scenes)?;
         self.validate_chapter_scene_target(chapter, &scenes)?;
 
@@ -301,8 +296,10 @@ impl NovelEngine {
             self.workspace_relative_path(&chapter_path)
         ))?;
 
-        self.state_manager.begin_next_chapter(&mut state);
-        self.state_manager.save_state(&state)?;
+        if should_advance_state {
+            self.state_manager.begin_next_chapter(&mut state);
+            self.state_manager.save_state(&state)?;
+        }
 
         Ok(chapter_path)
     }
@@ -383,6 +380,10 @@ impl NovelEngine {
 
     pub fn chapter_scene_target(&self) -> u32 {
         self.config.novel_settings.chapter_scene_target.max(1)
+    }
+
+    pub fn serialized_workflow_enabled(&self) -> bool {
+        self.config.novel_settings.serialized_workflow
     }
 
     pub fn novel_title(&self) -> &str {
@@ -823,7 +824,7 @@ impl NovelEngine {
         )
     }
 
-    fn ensure_generation_ready(&self) -> Result<()> {
+    fn prepare_generation_state(&self) -> Result<StoryState> {
         let missing = self.missing_required_novel_fields();
         if !missing.is_empty() {
             return Err(anyhow!(
@@ -833,19 +834,66 @@ impl NovelEngine {
             ));
         }
 
-        let state = self.state_manager.load_state()?;
+        let mut state = self.state_manager.load_state()?;
         let chapter = state.current_chapter;
         let scenes = self.load_scenes_for_chapter(chapter)?;
         let target = self.chapter_scene_target() as usize;
         if scenes.len() >= target {
-            return Err(anyhow!(
-                "chapter scene limit reached for chapter {:03}: target is {} scene(s). compile the chapter before drafting more",
-                chapter,
-                target
-            ));
+            if !self.serialized_workflow_enabled() {
+                return Err(anyhow!(
+                    "chapter scene limit reached for chapter {:03}: target is {} scene(s). compile the chapter before drafting more",
+                    chapter,
+                    target
+                ));
+            }
+
+            if state.stage != "scene_approved" {
+                let current_scene = state
+                    .current_scene_id
+                    .as_deref()
+                    .unwrap_or("the current scene");
+                return Err(anyhow!(
+                    "serialized workflow reached the internal chapter boundary for chapter {:03}. review and approve {} before drafting the next scene",
+                    chapter,
+                    current_scene
+                ));
+            }
+
+            self.state_manager.begin_next_chapter(&mut state);
+            self.state_manager.save_state(&state)?;
         }
 
-        Ok(())
+        Ok(state)
+    }
+
+    fn resolve_chapter_compilation_target(
+        &self,
+        state: &StoryState,
+    ) -> Result<(u32, Vec<Scene>, bool)> {
+        let chapter = state.current_chapter;
+        let scenes = self.load_scenes_for_chapter(chapter)?;
+        if self.serialized_workflow_enabled() {
+            let target = self.chapter_scene_target() as usize;
+            if scenes.len() >= target {
+                return Ok((chapter, scenes, false));
+            }
+
+            if chapter > 1 {
+                let previous_chapter = chapter - 1;
+                let previous_scenes = self.load_scenes_for_chapter(previous_chapter)?;
+                if !previous_scenes.is_empty() {
+                    return Ok((previous_chapter, previous_scenes, false));
+                }
+            }
+
+            if !scenes.is_empty() {
+                return Ok((chapter, scenes, false));
+            }
+        } else if !scenes.is_empty() {
+            return Ok((chapter, scenes, true));
+        }
+
+        Err(anyhow!("no scenes found for chapter {:03}", chapter))
     }
 
     fn derive_chapter_short_title(&self, chapter: u32, scenes: &[Scene]) -> String {
