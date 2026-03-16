@@ -373,6 +373,7 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 - core/story/active memory markdown 관리
 - scene markdown 저장 및 조회
 - planner/writer/editor/critic 프롬프트 템플릿 분리
+- planner/critic JSON schema validation 강화와 malformed payload 차단
 - `llm_backend` 전역 설정과 `doctor`/`capabilities`의 backend 진단 노출
 - scene 생성 로그 저장
 - rewrite 원본/수정본 snapshot 보존
@@ -384,8 +385,8 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 
 ## 다음 고도화 포인트
 
-- planner 출력 schema 검증 강화
 - chapter/arc 단위 요약 memory 자동화
 - 승인 이력 및 diff 로그
 - backend registry와 backend별 doctor/install 가이드 확장
+- command별 더 세분화된 schema_version / error taxonomy
 - release/install 원격 end-to-end smoke check 자동화

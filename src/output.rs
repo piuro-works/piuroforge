@@ -289,6 +289,32 @@ impl ErrorOutput {
             };
         }
 
+        if reason.contains("planner returned invalid scene plan JSON")
+            || reason.contains("planner returned scene plan without")
+            || reason.contains("critic returned invalid review JSON")
+            || reason.contains("critic returned issue")
+        {
+            return Self {
+                schema_version: OUTPUT_SCHEMA_VERSION,
+                status: "error",
+                agent_mode: false,
+                command: command.to_string(),
+                workspace: workspace_display,
+                error_code: "invalid_llm_payload".to_string(),
+                reason,
+                remediation: vec![
+                    "Retry once. If the same error repeats, the active LLM/backend is not following the HeeForge JSON contract."
+                        .to_string(),
+                    "If you are developing a custom backend, validate planner output fields and critic review JSON before returning it to HeeForge."
+                        .to_string(),
+                    example_for("doctor", workspace),
+                    example_for(command, workspace),
+                ],
+                example_command: Some(example_for(command, workspace)),
+                details: vec![],
+            };
+        }
+
         if looks_like_codex_error(&reason) {
             let mut remediation = vec!["Open a terminal and run: codex login".to_string()];
             if looks_like_network_error(&reason) {

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use std::sync::Arc;
 
 use crate::agents::base::{strip_code_fences, Agent, AgentContext};
@@ -96,6 +96,26 @@ pub struct WorldExpansionResponse {
     pub warnings: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ParsedScenePlan {
+    plan: ScenePlan,
+    warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ParsedReviewOutcome {
+    outcome: ReviewOutcome,
+    warnings: Vec<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct ReviewPayload {
+    #[serde(default)]
+    score: Option<u32>,
+    #[serde(default)]
+    issues: Vec<ReviewIssue>,
+}
+
 #[derive(Clone)]
 pub struct CliNovelBackend {
     runner: Arc<dyn PromptRunner>,
@@ -131,15 +151,14 @@ impl NovelBackend for CliNovelBackend {
         if let Some(warning) = planner_run.fallback_warning.clone() {
             warnings.push(warning);
         }
-        let mut scene_plan = parse_scene_plan(
+        let parsed_plan = parse_scene_plan(
             &planner_run.output,
             request.chapter,
             request.scene_number,
             chapter_scene_target,
-        );
-        scene_plan.chapter = request.chapter;
-        scene_plan.scene_number = request.scene_number;
-        scene_plan.chapter_role = scene_plan.effective_chapter_role(chapter_scene_target);
+        )?;
+        warnings.extend(parsed_plan.warnings);
+        let scene_plan = parsed_plan.plan;
 
         let writer = WriterAgent::new(self.runner.clone());
         let writer_context = AgentContext {
@@ -222,7 +241,9 @@ impl NovelBackend for CliNovelBackend {
             warnings.push(warning);
         }
 
-        let outcome = parse_review_outcome(&run.output);
+        let parsed_outcome = parse_review_outcome(&run.output)?;
+        warnings.extend(parsed_outcome.warnings);
+        let outcome = parsed_outcome.outcome;
 
         Ok(ReviewResponse {
             score: outcome.score,
@@ -334,83 +355,186 @@ fn parse_scene_plan(
     chapter: u32,
     scene_number: u32,
     chapter_scene_target: u32,
-) -> ScenePlan {
+) -> Result<ParsedScenePlan> {
     let cleaned = strip_code_fences(raw);
-    let mut plan = serde_json::from_str::<ScenePlan>(&cleaned).unwrap_or_else(|_| ScenePlan {
-        chapter,
-        scene_number,
-        short_title: "Decision at the Threshold".to_string(),
-        chapter_role: chapter_role_for(scene_number, chapter_scene_target),
-        goal: "The protagonist pushes the story into a new decision point.".to_string(),
-        conflict: "An ally and a threat demand mutually exclusive choices.".to_string(),
-        outcome: "The protagonist gains momentum, but the cost becomes personal.".to_string(),
-    });
+    let mut plan = serde_json::from_str::<ScenePlan>(&cleaned).map_err(|error| {
+        anyhow!(
+            "planner returned invalid scene plan JSON: {error}; excerpt: {}",
+            compact_response_excerpt(&cleaned)
+        )
+    })?;
+    let mut warnings = Vec::new();
+    let expected_role = chapter_role_for(scene_number, chapter_scene_target);
 
     if plan.chapter == 0 {
         plan.chapter = chapter;
+        warnings.push(format!(
+            "planner omitted chapter; using expected chapter {}.",
+            chapter
+        ));
+    } else if plan.chapter != chapter {
+        warnings.push(format!(
+            "planner returned chapter {} but current chapter is {}; using current chapter.",
+            plan.chapter, chapter
+        ));
+        plan.chapter = chapter;
     }
+
     if plan.scene_number == 0 {
         plan.scene_number = scene_number;
+        warnings.push(format!(
+            "planner omitted scene_number; using expected scene {}.",
+            scene_number
+        ));
+    } else if plan.scene_number != scene_number {
+        warnings.push(format!(
+            "planner returned scene_number {} but expected {}; using expected scene number.",
+            plan.scene_number, scene_number
+        ));
+        plan.scene_number = scene_number;
+    }
+
+    if plan.short_title.trim().is_empty() {
+        bail!("planner returned scene plan without short_title");
     }
     if plan.goal.trim().is_empty() {
-        plan.goal = "The protagonist pushes the story into a new decision point.".to_string();
-    }
-    if plan.short_title.trim().is_empty() {
-        plan.short_title = plan.effective_short_title();
-    }
-    if plan.chapter_role.trim().is_empty() {
-        plan.chapter_role = chapter_role_for(plan.scene_number, chapter_scene_target);
+        bail!("planner returned scene plan without goal");
     }
     if plan.conflict.trim().is_empty() {
-        plan.conflict = "An ally and a threat demand mutually exclusive choices.".to_string();
+        bail!("planner returned scene plan without conflict");
     }
     if plan.outcome.trim().is_empty() {
-        plan.outcome = "The protagonist gains momentum, but the cost becomes personal.".to_string();
+        bail!("planner returned scene plan without outcome");
     }
 
-    plan
+    let returned_role = plan.chapter_role.trim();
+    if returned_role.is_empty() {
+        warnings.push(format!(
+            "planner omitted chapter_role; using expected `{expected_role}`."
+        ));
+        plan.chapter_role = expected_role;
+    } else if !is_valid_chapter_role(returned_role) {
+        warnings.push(format!(
+            "planner returned unsupported chapter_role `{returned_role}`; using expected `{expected_role}`."
+        ));
+        plan.chapter_role = expected_role;
+    } else if returned_role != expected_role {
+        warnings.push(format!(
+            "planner returned chapter_role `{returned_role}` but chapter policy expects `{expected_role}`; using expected role."
+        ));
+        plan.chapter_role = expected_role;
+    } else {
+        plan.chapter_role = returned_role.to_string();
+    }
+
+    plan.short_title = plan.short_title.trim().to_string();
+    plan.goal = plan.goal.trim().to_string();
+    plan.conflict = plan.conflict.trim().to_string();
+    plan.outcome = plan.outcome.trim().to_string();
+
+    Ok(ParsedScenePlan { plan, warnings })
 }
 
-fn parse_review_outcome(raw: &str) -> ReviewOutcome {
+fn parse_review_outcome(raw: &str) -> Result<ParsedReviewOutcome> {
     let cleaned = strip_code_fences(raw);
 
-    #[derive(serde::Deserialize)]
-    struct ReviewPayload {
-        #[serde(default)]
-        score: Option<u32>,
-        #[serde(default)]
-        issues: Vec<ReviewIssue>,
-    }
-
     if let Ok(payload) = serde_json::from_str::<ReviewPayload>(&cleaned) {
-        let score = payload
-            .score
-            .map(normalize_review_score)
-            .unwrap_or_else(|| review_score_from_issue_count(payload.issues.len()));
-        return ReviewOutcome {
-            score,
-            issues: payload.issues,
-        };
+        return validate_review_payload(payload);
     }
 
     if let Ok(issues) = serde_json::from_str::<Vec<ReviewIssue>>(&cleaned) {
-        return ReviewOutcome {
-            score: review_score_from_issue_count(issues.len()),
-            issues,
-        };
+        let mut validated = validate_review_issues(issues)?;
+        validated.warnings.push(
+            "critic returned a legacy issue array without score; computed score from issue count."
+                .to_string(),
+        );
+        let score = review_score_from_issue_count(validated.outcome.issues.len());
+        validated.outcome.score = score;
+        return Ok(validated);
     }
 
-    let issues = vec![ReviewIssue {
-        issue_type: "analysis".to_string(),
-        description: cleaned,
-        line_start: None,
-        line_end: None,
-    }];
+    Err(anyhow!(
+        "critic returned invalid review JSON: excerpt: {}",
+        compact_response_excerpt(&cleaned)
+    ))
+}
 
-    ReviewOutcome {
-        score: review_score_from_issue_count(issues.len()),
-        issues,
+fn validate_review_payload(payload: ReviewPayload) -> Result<ParsedReviewOutcome> {
+    let mut validated = validate_review_issues(payload.issues)?;
+    validated.outcome.score = match payload.score {
+        Some(score) => {
+            let normalized = normalize_review_score(score);
+            if normalized != score {
+                validated.warnings.push(format!(
+                    "critic returned out-of-range score {}; clamped to {}.",
+                    score, normalized
+                ));
+            }
+            normalized
+        }
+        None => {
+            let computed = review_score_from_issue_count(validated.outcome.issues.len());
+            validated
+                .warnings
+                .push("critic omitted score; computed score from issue count.".to_string());
+            computed
+        }
+    };
+    Ok(validated)
+}
+
+fn validate_review_issues(issues: Vec<ReviewIssue>) -> Result<ParsedReviewOutcome> {
+    let mut warnings = Vec::new();
+    let mut normalized = Vec::with_capacity(issues.len());
+
+    for (index, mut issue) in issues.into_iter().enumerate() {
+        if issue.description.trim().is_empty() {
+            bail!("critic returned issue {} without description", index + 1);
+        }
+        issue.description = issue.description.trim().to_string();
+
+        if issue.issue_type.trim().is_empty() {
+            issue.issue_type = "analysis".to_string();
+            warnings.push(format!(
+                "critic omitted issue_type for issue {}; using `analysis`.",
+                index + 1
+            ));
+        } else {
+            issue.issue_type = issue.issue_type.trim().to_string();
+        }
+
+        if let (Some(start), Some(end)) = (issue.line_start, issue.line_end) {
+            if end < start {
+                issue.line_start = Some(end);
+                issue.line_end = Some(start);
+                warnings.push(format!(
+                    "critic returned reversed line range for issue {}; normalized to {}-{}.",
+                    index + 1,
+                    end,
+                    start
+                ));
+            }
+        }
+
+        normalized.push(issue);
     }
+
+    Ok(ParsedReviewOutcome {
+        outcome: ReviewOutcome {
+            score: review_score_from_issue_count(normalized.len()),
+            issues: normalized,
+        },
+        warnings,
+    })
+}
+
+fn is_valid_chapter_role(value: &str) -> bool {
+    matches!(value, "incident" | "escalation" | "cliffhanger")
+}
+
+fn compact_response_excerpt(raw: &str) -> String {
+    let flattened = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+    truncate_chars(flattened.trim(), 220)
 }
 
 fn compact_error_message(error: &anyhow::Error) -> String {
@@ -439,36 +563,92 @@ fn truncate_chars(value: &str, max_chars: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_review_outcome, CliNovelBackend, NovelBackend, ReviewRequest, RewriteRequest,
-        SceneGenerationRequest, WorldExpansionRequest,
+        parse_review_outcome, parse_scene_plan, CliNovelBackend, NovelBackend, ReviewRequest,
+        RewriteRequest, SceneGenerationRequest, WorldExpansionRequest,
     };
     use crate::config::NovelSettings;
     use crate::llm_runner::PromptRunner;
-    use crate::models::{MemoryBundle, StoryState};
+    use crate::models::{MemoryBundle, Scene, StoryState};
     use anyhow::{anyhow, Result};
     use std::collections::{BTreeMap, VecDeque};
     use std::sync::{Arc, Mutex};
 
     #[test]
-    fn parse_review_outcome_reads_object_score() {
+    fn parse_review_outcome_reads_object_score() -> Result<()> {
         let outcome = parse_review_outcome(
             r#"{"score":82,"issues":[{"issue_type":"pacing","description":"Tighten the middle.","line_start":3,"line_end":5}]}"#,
-        );
+        )?;
 
-        assert_eq!(outcome.score, 82);
-        assert_eq!(outcome.issues.len(), 1);
-        assert_eq!(outcome.issues[0].issue_type, "pacing");
+        assert_eq!(outcome.outcome.score, 82);
+        assert_eq!(outcome.outcome.issues.len(), 1);
+        assert_eq!(outcome.outcome.issues[0].issue_type, "pacing");
+        assert!(outcome.warnings.is_empty());
+        Ok(())
     }
 
     #[test]
-    fn parse_review_outcome_keeps_array_compatibility() {
+    fn parse_review_outcome_keeps_array_compatibility() -> Result<()> {
         let outcome = parse_review_outcome(
             r#"[{"issue_type":"logic","description":"Clarify the leap.","line_start":7,"line_end":9}]"#,
-        );
+        )?;
 
-        assert_eq!(outcome.score, 88);
-        assert_eq!(outcome.issues.len(), 1);
-        assert_eq!(outcome.issues[0].issue_type, "logic");
+        assert_eq!(outcome.outcome.score, 88);
+        assert_eq!(outcome.outcome.issues.len(), 1);
+        assert_eq!(outcome.outcome.issues[0].issue_type, "logic");
+        assert!(outcome
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("legacy issue array")));
+        Ok(())
+    }
+
+    #[test]
+    fn parse_scene_plan_rejects_missing_required_fields() {
+        let error = parse_scene_plan(
+            r#"{"chapter":1,"scene_number":1,"chapter_role":"incident","goal":"","conflict":"A","outcome":"B"}"#,
+            1,
+            1,
+            3,
+        )
+        .expect_err("planner payload without goal should fail");
+
+        assert!(
+            error.to_string().contains("without short_title")
+                || error.to_string().contains("without goal")
+        );
+    }
+
+    #[test]
+    fn parse_scene_plan_normalizes_mismatched_role_with_warning() -> Result<()> {
+        let parsed = parse_scene_plan(
+            r#"{"chapter":99,"scene_number":3,"short_title":"Wrong Turn","chapter_role":"incident","goal":"Push through the vault.","conflict":"The guard recognizes her.","outcome":"She gets the ledger but trips the alarm."}"#,
+            1,
+            2,
+            3,
+        )?;
+
+        assert_eq!(parsed.plan.chapter, 1);
+        assert_eq!(parsed.plan.scene_number, 2);
+        assert_eq!(parsed.plan.chapter_role, "escalation");
+        assert!(parsed
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("using current chapter")));
+        assert!(parsed
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("chapter policy expects `escalation`")));
+        Ok(())
+    }
+
+    #[test]
+    fn parse_review_outcome_rejects_freeform_text() {
+        let error = parse_review_outcome("This scene feels thin in the middle.")
+            .expect_err("freeform review payload should fail");
+
+        assert!(error
+            .to_string()
+            .contains("critic returned invalid review JSON"));
     }
 
     #[derive(Clone)]
@@ -600,5 +780,84 @@ mod tests {
         assert!(expanded.expansion.contains("Dock Ledger Protocol"));
 
         Ok(())
+    }
+
+    #[test]
+    fn cli_novel_backend_rejects_invalid_planner_payload() {
+        let backend = CliNovelBackend::new(Arc::new(FixturePromptRunner::from_pairs(&[(
+            "planner",
+            "not valid json",
+        )])));
+
+        let error = backend
+            .generate_scene(SceneGenerationRequest {
+                state: StoryState::default(),
+                novel: NovelSettings {
+                    title: "Glass Harbor".to_string(),
+                    genre: "Mystery".to_string(),
+                    tone: "Tense, atmospheric".to_string(),
+                    premise: "An investigator follows edited records.".to_string(),
+                    protagonist_name: "Yunseo".to_string(),
+                    language: "ko".to_string(),
+                    chapter_scene_target: 3,
+                    ..NovelSettings::default()
+                },
+                memory: MemoryBundle::default(),
+                planner_story_foundation: "Plot foundation".to_string(),
+                writer_story_foundation: "Writer foundation".to_string(),
+                editor_story_foundation: "Editor foundation".to_string(),
+                chapter: 1,
+                scene_number: 1,
+                scene_id: "scene_001_001".to_string(),
+                allow_dummy_fallback: false,
+            })
+            .expect_err("invalid planner payload should fail");
+
+        assert!(error
+            .to_string()
+            .contains("planner returned invalid scene plan JSON"));
+    }
+
+    #[test]
+    fn cli_novel_backend_rejects_invalid_critic_payload() {
+        let backend = CliNovelBackend::new(Arc::new(FixturePromptRunner::from_pairs(&[(
+            "critic",
+            "This needs stronger pacing.",
+        )])));
+
+        let error = backend
+            .review_scene(ReviewRequest {
+                state: StoryState::default(),
+                novel: NovelSettings {
+                    title: "Glass Harbor".to_string(),
+                    genre: "Mystery".to_string(),
+                    tone: "Tense, atmospheric".to_string(),
+                    premise: "An investigator follows edited records.".to_string(),
+                    protagonist_name: "Yunseo".to_string(),
+                    language: "ko".to_string(),
+                    chapter_scene_target: 3,
+                    ..NovelSettings::default()
+                },
+                memory: MemoryBundle::default(),
+                critic_story_foundation: "Critic foundation".to_string(),
+                scene: Scene {
+                    id: "scene_001_001".to_string(),
+                    chapter: 1,
+                    scene_number: 1,
+                    short_title: "Signal at the Gate".to_string(),
+                    chapter_role: "incident".to_string(),
+                    goal: "Confirm the route.".to_string(),
+                    conflict: "The clerk refuses access.".to_string(),
+                    outcome: "The route points to a sealed ledger.".to_string(),
+                    text: "Yunseo forced the ledger drawer open.".to_string(),
+                    status: "draft".to_string(),
+                },
+                allow_dummy_fallback: false,
+            })
+            .expect_err("invalid critic payload should fail");
+
+        assert!(error
+            .to_string()
+            .contains("critic returned invalid review JSON"));
     }
 }

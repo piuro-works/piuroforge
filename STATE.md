@@ -10,6 +10,7 @@
 - 전역 설정 `llm_backend`와 `doctor`/`capabilities` 출력이 현재 선택 backend와 지원 backend 목록을 노출한다.
 - `NovelEngine`는 이제 workspace/state/file 제어를 맡고, Codex 기반 scene/review/rewrite/world generation은 주입 가능한 `NovelBackend` 경계 뒤로 분리됐다.
 - LLM 호출 경계도 `PromptRunner` 추상화로 분리되어, Codex 외 CLI runner를 추가해도 planner/writer/editor/critic orchestration을 재사용할 수 있다.
+- planner/critic payload는 이제 더 엄격한 JSON schema validation을 거치며, malformed payload는 `invalid_llm_payload` 계열 에러로 실패한다.
 - `novel.toml`은 작가용 주석과 함께 `chapter_scene_target` 기본값을 노출하며, 기본 drafting 구조를 `incident -> escalation -> cliffhanger`로 안내한다.
 - project-level 문체 제어를 위해 `03_StoryBible/Voice/` 문서를 foundation에 포함하고, named-author imitation 대신 style/tone/genre/voice guide를 읽도록 방향을 잡았다.
 - 워크스페이스 기반 저장 모델이 적용되어 사람용 소설 데이터는 워크스페이스 루트의 numbered folder에, 엔진 런타임 데이터는 `.novel/`에 분리 저장된다.
@@ -104,14 +105,13 @@
 ## Known Gaps / Risks
 
 - opt-in dummy fallback 출력은 결정적이지만 문학적 품질은 낮다.
-- planner/critic 출력 파서는 기본 fallback이 있으며 schema 강제 수준이 낮다.
 - chapter 승인 정책과 open conflict 해소 정책은 아직 단순하다.
-- 실제 codex 응답 형식이 JSON 규약을 어기면 fallback 동작에 의존하게 된다.
+- 실제 codex 응답 형식이 JSON 규약을 어기면 즉시 실패하므로, backend별 prompt/adapter 품질 관리가 더 중요해졌다.
 - JSON 출력 계약은 현재 안정화됐지만 아직 command별 세부 schema versioning은 없다.
 - 실제 codex 응답 시간이 긴 작업에서는 기본 120초 timeout이 짧을 수 있어 운영 환경에 맞춘 조정이 필요할 수 있다.
 
 ## Recommended Next Actions
 
-1. planner/critic 출력 schema validation을 강화한다.
+1. chapter/arc summary memory를 자동 생성한다.
 2. `doctor` 명령에 backend별 설치/로그인 가이드를 확장한다.
 3. GitHub Release 원격 자산을 대상으로 `install.sh` end-to-end smoke check를 한 번 더 수행한다.
