@@ -16,6 +16,10 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
     )
     .detail("scene_id", scene.id.clone())
     .detail("short_title", scene.effective_short_title())
+    .detail(
+        "chapter_role",
+        scene.effective_chapter_role(engine.chapter_scene_target()),
+    )
     .detail("goal", scene.goal.clone())
     .detail("conflict", scene.conflict.clone())
     .detail("outcome", scene.outcome.clone())

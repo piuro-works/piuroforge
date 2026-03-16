@@ -5,11 +5,19 @@ Novel title: {{title}}
 Tone: {{tone}}
 Premise: {{premise}}
 Protagonist: {{protagonist_name}}
+Chapter role: {{chapter_role}}
 Instruction: {{instruction}}
 Goal: {{goal}}
 Conflict: {{conflict}}
 Outcome: {{outcome}}
 Keep continuity with the story foundation below.
+Editing priorities:
+- reduce explanation that tells the emotion too directly
+- preserve concrete action beats around dialogue
+- remove obvious word repetition and repetitive sentence openings
+- keep each speaker's voice distinct and consistent with the character bible
+- keep the scene aligned with its chapter role: incident, escalation, or cliffhanger
+- do not flatten the prose into one uniform sentence length
 
 Story foundation:
 {{story_foundation}}

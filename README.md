@@ -29,6 +29,8 @@ scene 생성을 시작하기 위한 필수 메타는 다음이다.
 
 scene 자체에는 manuscript-friendly `short_title`이 추가로 저장되며, scene 파일명 slug는 기본적으로 이 값을 사용한다.
 chapter도 compiled `short_title`을 가지며 chapter 파일명 slug는 이 값을 사용한다.
+기본 chapter drafting 정책은 `chapter_scene_target = 3`이며, scene 역할은 `incident -> escalation -> cliffhanger`로 진행된다.
+이 값은 `novel.toml`에서 바꿀 수 있지만, 일반 사용자는 기본값을 유지하는 쪽이 안정적이다.
 디스크의 `story_memory.md`는 전체 이력을 유지하지만, planner/writer/expand-world 프롬프트에는 최근성과 신호가 높은 섹션 위주로 제한된 prompt view를 사용해 장편 누적 시 컨텍스트 폭주를 완화한다.
 
 ## 설치
@@ -81,6 +83,7 @@ curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh
 중요한 구분도 있다. Codex 같은 에이전트, IDE agent, 샌드박스 실행기 안에서 `heeforge`를 대신 호출하면 그 호스트가 자체 보안 승인창을 띄울 수 있다. 그 승인창은 HeeForge의 추가 설정 단계가 아니라, 그 호스트 환경의 정책이다. 사용자 본인 터미널에서 직접 `heeforge`를 실행할 때는 HeeForge가 별도의 승인 UX를 요구하지 않는다.
 
 `status`와 `next-scene`은 이제 workspace의 브리프/바이블/플롯 문서를 읽어 준비도를 계산한다. 준비도가 낮으면 경고를 보여주고, planner/writer/editor/critic도 그 문서들을 실제 프롬프트에 사용한다.
+특히 character 문서의 `Voice Notes`, `Speech Rhythm`, `Favorite Diction`, `Taboo Phrases`, `Emotional Leakage`, `Non-Negotiable Invariants` 섹션은 별도 voice guide로 추출돼 dialogue consistency에 직접 반영된다.
 
 ## 빌드
 

@@ -6,6 +6,7 @@ const BRIEF_SECTION_LIMIT: usize = 2_400;
 const BIBLE_SECTION_LIMIT: usize = 4_800;
 const PLOT_SECTION_LIMIT: usize = 3_200;
 const RESEARCH_SECTION_LIMIT: usize = 1_600;
+const CHARACTER_VOICE_GUIDE_LIMIT: usize = 2_400;
 const FILE_EXCERPT_LIMIT: usize = 1_200;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -175,10 +176,12 @@ fn render_prompt_context(
     } else {
         status.missing_items.join(" | ")
     };
+    let character_voice_guide = render_character_voice_guide(workspace_dir, character_docs)?;
 
     Ok(format!(
         "Story foundation score: {score}/100 ({level})\nMissing foundation items: {missing}\n\n\
 Project brief excerpts:\n{brief}\n\n\
+Character voice guide:\n{voice}\n\n\
 Character bible excerpts:\n{characters}\n\n\
 World and rule excerpts:\n{world}\n\n\
 Plot outline excerpts:\n{plot}\n\n\
@@ -187,11 +190,170 @@ Research excerpts:\n{research}",
         level = status.level(),
         missing = missing,
         brief = render_section(workspace_dir, brief_docs, BRIEF_SECTION_LIMIT)?,
+        voice = character_voice_guide,
         characters = render_section(workspace_dir, character_docs, BIBLE_SECTION_LIMIT)?,
         world = render_section(workspace_dir, world_docs, BIBLE_SECTION_LIMIT)?,
         plot = render_section(workspace_dir, plot_docs, PLOT_SECTION_LIMIT)?,
         research = render_section(workspace_dir, research_docs, RESEARCH_SECTION_LIMIT)?,
     ))
+}
+
+fn render_character_voice_guide(workspace_dir: &Path, docs: &[PathBuf]) -> Result<String> {
+    if docs.is_empty() {
+        return Ok("No character voice profiles provided yet.".to_string());
+    }
+
+    let mut rendered = String::new();
+    for path in docs {
+        let content = fs::read_to_string(path)
+            .with_context(|| format!("failed to read story foundation file {}", path.display()))?;
+        let profile = build_character_voice_profile(&content);
+        if profile.is_empty() {
+            continue;
+        }
+
+        let relative = path
+            .strip_prefix(workspace_dir)
+            .unwrap_or(path)
+            .display()
+            .to_string();
+        let mut candidate = format!("### {relative}\n");
+        for line in profile {
+            candidate.push_str("- ");
+            candidate.push_str(&line);
+            candidate.push('\n');
+        }
+        candidate.push('\n');
+
+        if rendered.len() + candidate.len() > CHARACTER_VOICE_GUIDE_LIMIT {
+            break;
+        }
+
+        rendered.push_str(&candidate);
+    }
+
+    if rendered.trim().is_empty() {
+        Ok("No explicit character voice sections found yet.".to_string())
+    } else {
+        Ok(rendered.trim().to_string())
+    }
+}
+
+fn build_character_voice_profile(content: &str) -> Vec<String> {
+    let sections = extract_markdown_sections(content);
+    let mut profile = Vec::new();
+
+    push_profile_line(
+        &mut profile,
+        "Character",
+        first_section(&sections, &["Character ID", "Name", "Character"]),
+    );
+    push_profile_line(
+        &mut profile,
+        "Role",
+        first_section(&sections, &["Role In Story", "Role"]),
+    );
+    push_profile_line(
+        &mut profile,
+        "Voice",
+        first_section(&sections, &["Voice Notes", "Voice", "Voice Summary"]),
+    );
+    push_profile_line(
+        &mut profile,
+        "Speech rhythm",
+        first_section(&sections, &["Speech Rhythm", "Dialogue Rhythm"]),
+    );
+    push_profile_line(
+        &mut profile,
+        "Preferred diction",
+        first_section(
+            &sections,
+            &["Favorite Diction", "Preferred Diction", "Signature Words"],
+        ),
+    );
+    push_profile_line(
+        &mut profile,
+        "Taboo phrases",
+        first_section(&sections, &["Taboo Phrases", "Avoid Saying"]),
+    );
+    push_profile_line(
+        &mut profile,
+        "Emotional leakage",
+        first_section(&sections, &["Emotional Leakage", "Emotion Under Stress"]),
+    );
+    push_profile_line(
+        &mut profile,
+        "Invariants",
+        first_section(&sections, &["Non-Negotiable Invariants", "Invariants"]),
+    );
+
+    profile
+}
+
+fn extract_markdown_sections(content: &str) -> Vec<(String, String)> {
+    let mut sections = Vec::new();
+    let mut current_heading: Option<String> = None;
+    let mut current_body = String::new();
+
+    for line in content.lines() {
+        if let Some(heading) = line.strip_prefix("## ") {
+            if let Some(heading) = current_heading.take() {
+                sections.push((heading, current_body.trim().to_string()));
+                current_body.clear();
+            }
+            current_heading = Some(heading.trim().to_string());
+            continue;
+        }
+
+        if current_heading.is_some() {
+            current_body.push_str(line);
+            current_body.push('\n');
+        }
+    }
+
+    if let Some(heading) = current_heading {
+        sections.push((heading, current_body.trim().to_string()));
+    }
+
+    sections
+}
+
+fn first_section<'a>(sections: &'a [(String, String)], names: &[&str]) -> Option<&'a str> {
+    for name in names {
+        if let Some((_, value)) = sections
+            .iter()
+            .find(|(heading, value)| heading.eq_ignore_ascii_case(name) && !value.trim().is_empty())
+        {
+            return Some(value.as_str());
+        }
+    }
+
+    None
+}
+
+fn push_profile_line(profile: &mut Vec<String>, label: &str, value: Option<&str>) {
+    let Some(value) = value else {
+        return;
+    };
+
+    let compact = compact_markdown_value(value, 220);
+    if compact.is_empty() {
+        return;
+    }
+
+    profile.push(format!("{label}: {compact}"));
+}
+
+fn compact_markdown_value(value: &str, max_chars: usize) -> String {
+    let compact = value
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(|line| line.trim_start_matches("- ").trim())
+        .collect::<Vec<_>>()
+        .join(" | ");
+
+    truncate_chars(compact.trim(), max_chars)
 }
 
 fn render_section(workspace_dir: &Path, docs: &[PathBuf], max_chars: usize) -> Result<String> {
@@ -352,6 +514,32 @@ mod tests {
             .missing_items
             .iter()
             .any(|item| item.contains("plot outline")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn character_voice_guide_extracts_voice_sections() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let workspace = temp_dir.path();
+        fs::create_dir_all(workspace.join("03_StoryBible/Characters"))?;
+        fs::write(
+            workspace.join("03_StoryBible/Characters/Lead.md"),
+            "# Character\n\n## Character ID\nSeorin\n\n## Role In Story\nProtagonist\n\n## Voice Notes\nShort, precise, and impatient.\n\n## Speech Rhythm\nMostly clipped sentences.\n\n## Taboo Phrases\nNever begs. Never speaks in slogans.\n\n## Non-Negotiable Invariants\nWill not bluff about facts she has not verified.\n",
+        )?;
+
+        let bundle = load_story_foundation(workspace)?;
+
+        assert!(bundle.prompt_context.contains("Character voice guide:"));
+        assert!(bundle
+            .prompt_context
+            .contains("Voice: Short, precise, and impatient."));
+        assert!(bundle
+            .prompt_context
+            .contains("Speech rhythm: Mostly clipped sentences."));
+        assert!(bundle
+            .prompt_context
+            .contains("Taboo phrases: Never begs. Never speaks in slogans."));
 
         Ok(())
     }

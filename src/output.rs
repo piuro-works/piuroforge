@@ -263,6 +263,40 @@ impl ErrorOutput {
             };
         }
 
+        if reason.contains("chapter scene limit reached") {
+            return Self {
+                status: "error",
+                command: command.to_string(),
+                workspace: workspace_display,
+                error_code: "chapter_scene_limit_reached".to_string(),
+                reason,
+                remediation: vec![
+                    "Compile the current chapter before drafting more scenes.".to_string(),
+                    example_for("next-chapter", workspace),
+                ],
+                example_command: Some(example_for("next-chapter", workspace)),
+                details: vec![],
+            };
+        }
+
+        if reason.contains("chapter scene target not reached") {
+            return Self {
+                status: "error",
+                command: command.to_string(),
+                workspace: workspace_display,
+                error_code: "chapter_incomplete".to_string(),
+                reason,
+                remediation: vec![
+                    "Finish the missing scene roles for this chapter before compiling it."
+                        .to_string(),
+                    example_for("status", workspace),
+                    example_for("next-scene", workspace),
+                ],
+                example_command: Some(example_for("next-scene", workspace)),
+                details: vec![],
+            };
+        }
+
         if reason.contains("no scenes found for chapter") {
             return Self {
                 status: "error",

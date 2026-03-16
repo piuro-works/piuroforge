@@ -4,9 +4,10 @@ use crate::models::Scene;
 
 pub fn render_scene(scene: &Scene) -> String {
     format!(
-        "# Scene {id}\n\n## Short Title\n{short_title}\n\n## Goal\n{goal}\n\n## Conflict\n{conflict}\n\n## Outcome\n{outcome}\n\n## Status\n{status}\n\n## Text\n{text}\n",
+        "# Scene {id}\n\n## Short Title\n{short_title}\n\n## Chapter Role\n{chapter_role}\n\n## Goal\n{goal}\n\n## Conflict\n{conflict}\n\n## Outcome\n{outcome}\n\n## Status\n{status}\n\n## Text\n{text}\n",
         id = scene.id.as_str(),
         short_title = scene.effective_short_title(),
+        chapter_role = scene.chapter_role.trim(),
         goal = scene.goal.trim(),
         conflict = scene.conflict.trim(),
         outcome = scene.outcome.trim(),
@@ -32,6 +33,7 @@ pub fn parse_scene(markdown: &str) -> Result<Scene> {
     let mut conflict = String::new();
     let mut outcome = String::new();
     let mut short_title = String::new();
+    let mut chapter_role = String::new();
     let mut status = String::new();
     let mut text = String::new();
     let mut current_section: Option<&str> = None;
@@ -44,6 +46,7 @@ pub fn parse_scene(markdown: &str) -> Result<Scene> {
 
         let target = match current_section {
             Some("Short Title") => &mut short_title,
+            Some("Chapter Role") => &mut chapter_role,
             Some("Goal") => &mut goal,
             Some("Conflict") => &mut conflict,
             Some("Outcome") => &mut outcome,
@@ -65,6 +68,7 @@ pub fn parse_scene(markdown: &str) -> Result<Scene> {
         chapter,
         scene_number,
         short_title: short_title.trim().to_string(),
+        chapter_role: chapter_role.trim().to_string(),
         goal: goal.trim().to_string(),
         conflict: conflict.trim().to_string(),
         outcome: outcome.trim().to_string(),
@@ -92,6 +96,10 @@ pub fn render_chapter(chapter: u32, short_title: &str, scenes: &[Scene]) -> Stri
             "## {}: {}\n\n",
             scene.id.as_str(),
             scene.effective_short_title()
+        ));
+        content.push_str(&format!(
+            "Chapter role: {}\n\n",
+            scene.effective_chapter_role(scenes.len() as u32)
         ));
         content.push_str(&format!("Goal: {}\n\n", scene.goal.trim()));
         content.push_str(&format!("Conflict: {}\n\n", scene.conflict.trim()));

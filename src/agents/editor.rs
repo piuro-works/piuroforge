@@ -24,6 +24,7 @@ impl EditorAgent {
             .instruction
             .clone()
             .unwrap_or_else(|| "Tighten repetition and polish sentence flow.".to_string());
+        let chapter_role = scene.effective_chapter_role(context.novel.chapter_scene_target);
 
         Ok(render_template(
             EDITOR_TEMPLATE,
@@ -32,6 +33,7 @@ impl EditorAgent {
                 ("tone", context.novel.tone.as_str()),
                 ("premise", context.novel.premise.as_str()),
                 ("protagonist_name", context.novel.protagonist_name.as_str()),
+                ("chapter_role", chapter_role.as_str()),
                 ("instruction", instruction.as_str()),
                 ("goal", scene.goal.as_str()),
                 ("conflict", scene.conflict.as_str()),

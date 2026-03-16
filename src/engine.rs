@@ -258,6 +258,7 @@ impl NovelEngine {
             return Err(anyhow!("no scenes found for chapter {:03}", chapter));
         }
         self.validate_scene_sequence(chapter, &scenes)?;
+        self.validate_chapter_scene_target(chapter, &scenes)?;
 
         let chapter_short_title = self.derive_chapter_short_title(chapter, &scenes);
         let content = render_chapter(chapter, &chapter_short_title, &scenes);
@@ -350,6 +351,10 @@ impl NovelEngine {
 
     pub fn story_foundation_status(&self) -> Result<StoryFoundationStatus> {
         Ok(self.load_story_foundation_bundle()?.status)
+    }
+
+    pub fn chapter_scene_target(&self) -> u32 {
+        self.config.novel_settings.chapter_scene_target.max(1)
     }
 
     pub fn novel_title(&self) -> &str {
@@ -635,6 +640,20 @@ impl NovelEngine {
         Ok(())
     }
 
+    fn validate_chapter_scene_target(&self, chapter: u32, scenes: &[Scene]) -> Result<()> {
+        let target = self.chapter_scene_target() as usize;
+        if scenes.len() != target {
+            return Err(anyhow!(
+                "chapter scene target not reached for chapter {:03}: expected {} scene(s) but found {}",
+                chapter,
+                target,
+                scenes.len()
+            ));
+        }
+
+        Ok(())
+    }
+
     fn next_rewrite_revision(&self, scene_id: &str) -> Result<u32> {
         let mut max_revision = 0;
         for dir in [
@@ -677,12 +696,13 @@ impl NovelEngine {
 
     fn render_active_memory(&self, state: &StoryState, scene: &Scene) -> String {
         format!(
-            "# Active Memory\n\n- Arc: {}\n- Chapter: {}\n- Scene: {}\n- Scene ID: {}\n- Short Title: {}\n- Stage: {}\n- Goal: {}\n- Conflict: {}\n- Outcome: {}\n",
+            "# Active Memory\n\n- Arc: {}\n- Chapter: {}\n- Scene: {}\n- Scene ID: {}\n- Short Title: {}\n- Chapter Role: {}\n- Stage: {}\n- Goal: {}\n- Conflict: {}\n- Outcome: {}\n",
             state.current_arc,
             scene.chapter,
             scene.scene_number,
             scene.id.as_str(),
             scene.effective_short_title(),
+            scene.effective_chapter_role(self.chapter_scene_target()),
             state.stage.as_str(),
             scene.goal.as_str(),
             scene.conflict.as_str(),
@@ -692,9 +712,10 @@ impl NovelEngine {
 
     fn render_story_memory_entry(&self, scene: &Scene) -> String {
         format!(
-            "## Scene {}: {}\n- Goal: {}\n- Conflict: {}\n- Outcome: {}\n- Status: {}\n",
+            "## Scene {}: {}\n- Chapter Role: {}\n- Goal: {}\n- Conflict: {}\n- Outcome: {}\n- Status: {}\n",
             scene.id.as_str(),
             scene.effective_short_title(),
+            scene.effective_chapter_role(self.chapter_scene_target()),
             scene.goal.as_str(),
             scene.conflict.as_str(),
             scene.outcome.as_str(),
@@ -704,15 +725,27 @@ impl NovelEngine {
 
     fn ensure_generation_ready(&self) -> Result<()> {
         let missing = self.missing_required_novel_fields();
-        if missing.is_empty() {
-            return Ok(());
+        if !missing.is_empty() {
+            return Err(anyhow!(
+                "cannot generate scene. missing required novel config: {}. fill {} first",
+                missing.join(", "),
+                self.config.workspace_config_path.display()
+            ));
         }
 
-        Err(anyhow!(
-            "cannot generate scene. missing required novel config: {}. fill {} first",
-            missing.join(", "),
-            self.config.workspace_config_path.display()
-        ))
+        let state = self.state_manager.load_state()?;
+        let chapter = state.current_chapter;
+        let scenes = self.load_scenes_for_chapter(chapter)?;
+        let target = self.chapter_scene_target() as usize;
+        if scenes.len() >= target {
+            return Err(anyhow!(
+                "chapter scene limit reached for chapter {:03}: target is {} scene(s). compile the chapter before drafting more",
+                chapter,
+                target
+            ));
+        }
+
+        Ok(())
     }
 
     fn derive_chapter_short_title(&self, chapter: u32, scenes: &[Scene]) -> String {

@@ -803,6 +803,8 @@ fn next_chapter_json_output_includes_short_title_and_slugged_path() -> Result<()
     let engine = ready_engine(workspace.clone(), global_dir.clone())?;
     engine.init_project()?;
     engine.generate_next_scene()?;
+    engine.generate_next_scene()?;
+    engine.generate_next_scene()?;
 
     let output = Command::new(novel_bin())
         .arg("--workspace")
@@ -833,6 +835,41 @@ fn next_chapter_json_output_includes_short_title_and_slugged_path() -> Result<()
     assert!(chapter_path.ends_with("chapter_001-securing-the-lead.md"));
     let chapter_markdown = std::fs::read_to_string(chapter_path)?;
     assert!(chapter_markdown.contains("## Short Title\nSecuring the Lead"));
+
+    Ok(())
+}
+
+#[test]
+fn next_scene_json_error_after_chapter_scene_target_is_reached() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+    engine.generate_next_scene()?;
+    engine.generate_next_scene()?;
+    engine.generate_next_scene()?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("next-scene")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8(output.stderr)?;
+    let payload: Value = serde_json::from_str(&stderr)?;
+    assert_eq!(payload["status"], "error");
+    assert_eq!(payload["command"], "next-scene");
+    assert_eq!(payload["error_code"], "chapter_scene_limit_reached");
+    assert!(payload["reason"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("chapter scene limit reached"));
 
     Ok(())
 }
@@ -875,6 +912,39 @@ fn next_chapter_json_error_without_scenes_is_structured() -> Result<()> {
 }
 
 #[test]
+fn next_chapter_json_error_when_chapter_is_incomplete() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+    engine.generate_next_scene()?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("next-chapter")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8(output.stderr)?;
+    let payload: Value = serde_json::from_str(&stderr)?;
+    assert_eq!(payload["status"], "error");
+    assert_eq!(payload["command"], "next-chapter");
+    assert_eq!(payload["error_code"], "chapter_incomplete");
+    assert!(payload["reason"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("chapter scene target not reached"));
+
+    Ok(())
+}
+
+#[test]
 fn next_chapter_json_error_for_gapped_sequence_is_structured() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
@@ -888,6 +958,7 @@ fn next_chapter_json_error_for_gapped_sequence_is_structured() -> Result<()> {
             chapter: 1,
             scene_number: 1,
             short_title: "Goal One".to_string(),
+            chapter_role: "incident".to_string(),
             goal: "Goal one".to_string(),
             conflict: "Conflict one".to_string(),
             outcome: "Outcome one".to_string(),
@@ -902,6 +973,7 @@ fn next_chapter_json_error_for_gapped_sequence_is_structured() -> Result<()> {
             chapter: 1,
             scene_number: 3,
             short_title: "Goal Three".to_string(),
+            chapter_role: "cliffhanger".to_string(),
             goal: "Goal three".to_string(),
             conflict: "Conflict three".to_string(),
             outcome: "Outcome three".to_string(),

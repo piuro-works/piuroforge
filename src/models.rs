@@ -52,6 +52,8 @@ pub struct Scene {
     pub scene_number: u32,
     #[serde(default)]
     pub short_title: String,
+    #[serde(default)]
+    pub chapter_role: String,
     pub goal: String,
     pub conflict: String,
     pub outcome: String,
@@ -75,6 +77,14 @@ impl Scene {
         }
 
         format!("{}-{}.md", self.id, slug)
+    }
+
+    pub fn effective_chapter_role(&self, chapter_scene_target: u32) -> String {
+        if !self.chapter_role.trim().is_empty() {
+            return self.chapter_role.trim().to_string();
+        }
+
+        chapter_role_for(self.scene_number, chapter_scene_target)
     }
 }
 
@@ -117,6 +127,22 @@ pub(crate) fn derive_short_title(value: &str) -> String {
     }
 
     words.join(" ")
+}
+
+pub fn chapter_role_for(scene_number: u32, chapter_scene_target: u32) -> String {
+    if chapter_scene_target <= 1 {
+        return "cliffhanger".to_string();
+    }
+
+    if scene_number <= 1 {
+        return "incident".to_string();
+    }
+
+    if scene_number >= chapter_scene_target {
+        return "cliffhanger".to_string();
+    }
+
+    "escalation".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -173,6 +199,8 @@ pub struct ScenePlan {
     #[serde(default)]
     pub short_title: String,
     #[serde(default)]
+    pub chapter_role: String,
+    #[serde(default)]
     pub goal: String,
     #[serde(default)]
     pub conflict: String,
@@ -191,6 +219,14 @@ impl ScenePlan {
         }
 
         derive_short_title(&self.goal)
+    }
+
+    pub fn effective_chapter_role(&self, chapter_scene_target: u32) -> String {
+        if !self.chapter_role.trim().is_empty() {
+            return self.chapter_role.trim().to_string();
+        }
+
+        chapter_role_for(self.scene_number, chapter_scene_target)
     }
 }
 

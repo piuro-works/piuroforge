@@ -105,10 +105,11 @@ This workspace separates human-facing manuscript files from HeeForge runtime dat
 1. Open a terminal once and run `codex login`.\n\
 2. Run `heeforge doctor` in this workspace before the first real scene.\n\
 3. Before the first serious scene, fill at least one project brief, one plot note, and one character or world note.\n\
-4. If Doctor says ready, your HeeForge setup is finished. You can move on to `heeforge next-scene`.\n\
-5. Open `~/.config/heeforge/config.toml` if you want to review your HeeForge settings.\n\
-6. Leave `allow_dummy_fallback = false` for real drafting. Turn it on only if you intentionally want placeholder text while testing the folder workflow.\n\
-7. If you want automatic Git history for this novel workspace, turn on `workspace_auto_commit = true` in the same config file.\n\n\
+4. Keep the default chapter rhythm simple at first: incident -> escalation -> cliffhanger.\n\
+5. If Doctor says ready, your HeeForge setup is finished. You can move on to `heeforge next-scene`.\n\
+6. Open `~/.config/heeforge/config.toml` if you want to review your HeeForge settings.\n\
+7. Leave `allow_dummy_fallback = false` for real drafting. Turn it on only if you intentionally want placeholder text while testing the folder workflow.\n\
+8. If you want automatic Git history for this novel workspace, turn on `workspace_auto_commit = true` in the same config file.\n\n\
 If `next-scene` fails with `codex_unavailable`, that usually means either `codex login` is not finished yet or this machine cannot reach the Codex service because of internet, DNS, VPN, or proxy issues.\n\n\
 If you run HeeForge through another assistant, IDE agent, or sandboxed tool, that host may still ask for its own approval prompts. Those prompts are outside HeeForge.\n\n\
 ## Human Folders\n\n\
@@ -160,6 +161,7 @@ Suggested file naming:
 - `BRIEF-002-Season-Package.md`
 
 This is the place to lock premise, target length, audience, and voice commitments before drafting accelerates.
+Also lock the default chapter rhythm here before scenes pile up.
 ";
 
 const DRAFT_README: &str = "\
@@ -175,6 +177,11 @@ Human-facing manuscript work lives here.
 Generated scene naming:
 - `scene_001_001-securing-the-lead.md`
 - keep the stable scene id at the front so CLI commands can still target `scene_001_001`
+
+Default chapter rhythm:
+- scene 1 = incident
+- scene 2 = escalation
+- scene 3 = cliffhanger
 
 Generated chapter naming:
 - `chapter_001-securing-the-lead.md`
@@ -193,6 +200,7 @@ Use this folder to separate durable canon from draft prose.
 - `Plot/`: arc outlines, chapter maps, structural plans
 
 Keep these files readable in Git. They should be reference material for future drafting, not runtime logs.
+Character files should explicitly capture voice notes, speech rhythm, taboo phrases, and invariants so dialogue does not collapse into one tone.
 ";
 
 const RESEARCH_README: &str = "\
@@ -265,6 +273,11 @@ const STORY_BRIEF_TEMPLATE: &str = "\
 - What the prose must consistently do:
 - What the prose must avoid:
 
+## Chapter Structure Policy
+- Default chapter scene target: 3
+- Scene progression: incident -> escalation -> cliffhanger
+- When to break the default:
+
 ## Story Engine
 - What generates the next chapter naturally?
 - What keeps pressure on the cast?
@@ -283,6 +296,9 @@ const SCENE_TEMPLATE: &str = "\
 ## Short Title
 
 ## Viewpoint
+
+## Chapter Role
+- incident / escalation / cliffhanger
 
 ## Purpose In Chapter
 
@@ -307,6 +323,11 @@ const CHAPTER_TEMPLATE: &str = "\
 ## Short Title
 
 ## Chapter Purpose
+
+## Structure Policy
+- Scene 1: incident
+- Scene 2: escalation
+- Scene 3: cliffhanger
 
 ## Entry Condition
 
@@ -338,6 +359,14 @@ const CHARACTER_TEMPLATE: &str = "\
 ## Contradiction
 
 ## Voice Notes
+
+## Speech Rhythm
+
+## Favorite Diction
+
+## Taboo Phrases
+
+## Emotional Leakage
 
 ## Relationship Map
 

@@ -37,6 +37,8 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
     assert!(workspace.join("06_Review/Feedback").exists());
     assert!(workspace.join("06_Review/Revisions").exists());
     let workspace_config = std::fs::read_to_string(workspace.join("novel.toml"))?;
+    assert!(workspace_config.contains("chapter_scene_target = 3"));
+    assert!(workspace_config.contains("incident -> escalation -> cliffhanger"));
     assert!(workspace_config.contains("title = \"Demo Novel\""));
     let workspace_readme = std::fs::read_to_string(workspace.join("README.md"))?;
     assert!(workspace_readme.contains("This workspace separates human-facing manuscript files"));
@@ -49,7 +51,13 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
     let draft_readme = std::fs::read_to_string(workspace.join("02_Draft/README.md"))?;
     assert!(draft_readme.contains("Human-facing manuscript work lives here."));
     let template = std::fs::read_to_string(workspace.join("98_Templates/Scene Template.md"))?;
+    assert!(template.contains("## Chapter Role"));
+    assert!(template.contains("incident / escalation / cliffhanger"));
     assert!(template.contains("## Objective"));
+    let character_template =
+        std::fs::read_to_string(workspace.join("98_Templates/Character Template.md"))?;
+    assert!(character_template.contains("## Speech Rhythm"));
+    assert!(character_template.contains("## Taboo Phrases"));
     let review_template =
         std::fs::read_to_string(workspace.join("98_Templates/Review Pass Template.md"))?;
     assert!(review_template.contains("## Findings"));
@@ -124,6 +132,8 @@ fn generate_next_chapter_saves_slugged_markdown() -> Result<()> {
 
     engine.init_project()?;
     engine.generate_next_scene()?;
+    engine.generate_next_scene()?;
+    engine.generate_next_scene()?;
     let chapter_path = engine.generate_next_chapter()?;
 
     assert_eq!(
@@ -143,6 +153,25 @@ fn generate_next_chapter_saves_slugged_markdown() -> Result<()> {
     assert_eq!(state.current_chapter, 2);
     assert_eq!(state.current_scene, 0);
     assert_eq!(state.stage, "chapter_ready");
+
+    Ok(())
+}
+
+#[test]
+fn generate_next_scene_stops_after_chapter_scene_target() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let engine = test_engine(workspace.clone(), temp_dir.path().join("config-home"))?;
+
+    engine.init_project()?;
+    engine.generate_next_scene()?;
+    engine.generate_next_scene()?;
+    engine.generate_next_scene()?;
+
+    let error = engine
+        .generate_next_scene()
+        .expect_err("expected chapter scene target limit");
+    assert!(error.to_string().contains("chapter scene limit reached"));
 
     Ok(())
 }
@@ -200,6 +229,7 @@ fn next_chapter_rejects_gapped_scene_sequence() -> Result<()> {
             chapter: 1,
             scene_number: 1,
             short_title: "Goal One".to_string(),
+            chapter_role: "incident".to_string(),
             goal: "Goal one".to_string(),
             conflict: "Conflict one".to_string(),
             outcome: "Outcome one".to_string(),
@@ -214,6 +244,7 @@ fn next_chapter_rejects_gapped_scene_sequence() -> Result<()> {
             chapter: 1,
             scene_number: 3,
             short_title: "Goal Three".to_string(),
+            chapter_role: "cliffhanger".to_string(),
             goal: "Goal three".to_string(),
             conflict: "Conflict three".to_string(),
             outcome: "Outcome three".to_string(),
@@ -339,6 +370,7 @@ impl NovelBackend for StubBackend {
                 chapter: request.chapter,
                 scene_number: request.scene_number,
                 short_title: "Backend Separation".to_string(),
+                chapter_role: "incident".to_string(),
                 goal: "Prove the control engine only persists and advances state.".to_string(),
                 conflict: "The Codex-facing generation path must stay behind the backend boundary."
                     .to_string(),

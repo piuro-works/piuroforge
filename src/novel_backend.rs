@@ -8,8 +8,8 @@ use crate::agents::writer::WriterAgent;
 use crate::codex_runner::CodexRunner;
 use crate::config::NovelSettings;
 use crate::models::{
-    normalize_review_score, review_score_from_issue_count, MemoryBundle, ReviewIssue,
-    ReviewOutcome, Scene, ScenePlan, StoryState,
+    chapter_role_for, normalize_review_score, review_score_from_issue_count, MemoryBundle,
+    ReviewIssue, ReviewOutcome, Scene, ScenePlan, StoryState,
 };
 
 pub trait NovelBackend {
@@ -106,6 +106,7 @@ impl CodexNovelBackend {
 impl NovelBackend for CodexNovelBackend {
     fn generate_scene(&self, request: SceneGenerationRequest) -> Result<SceneGenerationResponse> {
         let mut warnings = Vec::new();
+        let chapter_scene_target = request.novel.chapter_scene_target.max(1);
 
         let planner = PlannerAgent::new(self.runner.clone(), true);
         let planner_context = AgentContext {
@@ -122,10 +123,15 @@ impl NovelBackend for CodexNovelBackend {
         if let Some(warning) = planner_run.fallback_warning.clone() {
             warnings.push(warning);
         }
-        let mut scene_plan =
-            parse_scene_plan(&planner_run.output, request.chapter, request.scene_number);
+        let mut scene_plan = parse_scene_plan(
+            &planner_run.output,
+            request.chapter,
+            request.scene_number,
+            chapter_scene_target,
+        );
         scene_plan.chapter = request.chapter;
         scene_plan.scene_number = request.scene_number;
+        scene_plan.chapter_role = scene_plan.effective_chapter_role(chapter_scene_target);
 
         let writer = WriterAgent::new(self.runner.clone(), true);
         let writer_context = AgentContext {
@@ -148,6 +154,7 @@ impl NovelBackend for CodexNovelBackend {
             chapter: request.chapter,
             scene_number: request.scene_number,
             short_title: scene_plan.effective_short_title(),
+            chapter_role: scene_plan.chapter_role.clone(),
             goal: scene_plan.goal.clone(),
             conflict: scene_plan.conflict.clone(),
             outcome: scene_plan.outcome.clone(),
@@ -283,12 +290,18 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
     }
 }
 
-fn parse_scene_plan(raw: &str, chapter: u32, scene_number: u32) -> ScenePlan {
+fn parse_scene_plan(
+    raw: &str,
+    chapter: u32,
+    scene_number: u32,
+    chapter_scene_target: u32,
+) -> ScenePlan {
     let cleaned = strip_code_fences(raw);
     let mut plan = serde_json::from_str::<ScenePlan>(&cleaned).unwrap_or_else(|_| ScenePlan {
         chapter,
         scene_number,
         short_title: "Decision at the Threshold".to_string(),
+        chapter_role: chapter_role_for(scene_number, chapter_scene_target),
         goal: "The protagonist pushes the story into a new decision point.".to_string(),
         conflict: "An ally and a threat demand mutually exclusive choices.".to_string(),
         outcome: "The protagonist gains momentum, but the cost becomes personal.".to_string(),
@@ -305,6 +318,9 @@ fn parse_scene_plan(raw: &str, chapter: u32, scene_number: u32) -> ScenePlan {
     }
     if plan.short_title.trim().is_empty() {
         plan.short_title = plan.effective_short_title();
+    }
+    if plan.chapter_role.trim().is_empty() {
+        plan.chapter_role = chapter_role_for(plan.scene_number, chapter_scene_target);
     }
     if plan.conflict.trim().is_empty() {
         plan.conflict = "An ally and a threat demand mutually exclusive choices.".to_string();

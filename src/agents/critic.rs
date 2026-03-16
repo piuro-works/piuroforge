@@ -21,6 +21,7 @@ impl CriticAgent {
             .scene
             .as_ref()
             .ok_or_else(|| anyhow!("critic requires a scene"))?;
+        let chapter_role = scene.effective_chapter_role(context.novel.chapter_scene_target);
 
         Ok(render_template(
             CRITIC_TEMPLATE,
@@ -30,6 +31,7 @@ impl CriticAgent {
                 ("tone", context.novel.tone.as_str()),
                 ("premise", context.novel.premise.as_str()),
                 ("protagonist_name", context.novel.protagonist_name.as_str()),
+                ("chapter_role", chapter_role.as_str()),
                 ("goal", scene.goal.as_str()),
                 ("conflict", scene.conflict.as_str()),
                 ("outcome", scene.outcome.as_str()),

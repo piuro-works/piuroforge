@@ -149,7 +149,32 @@ default_language = {default_language:?}\n\
     }
 
     pub fn render_workspace_config(&self) -> Result<String> {
-        toml::to_string_pretty(&self.novel_settings).context("failed to serialize workspace config")
+        let mut rendered = String::from(
+            "# HeeForge novel workspace settings\n\
+#\n\
+# Writing policy defaults:\n\
+# - chapter_scene_target = 3 means each chapter should usually draft as incident -> escalation -> cliffhanger\n\
+# - Fill the story bible before serious drafting so planner and writer have real canon to follow\n\
+\n",
+        );
+        rendered.push_str(&format!("version = {}\n", self.novel_settings.version));
+        rendered.push_str(&format!("title = {:?}\n", self.novel_settings.title));
+        if let Some(author) = &self.novel_settings.author {
+            rendered.push_str(&format!("author = {:?}\n", author));
+        }
+        rendered.push_str(&format!("language = {:?}\n", self.novel_settings.language));
+        rendered.push_str(&format!("genre = {:?}\n", self.novel_settings.genre));
+        rendered.push_str(&format!("tone = {:?}\n", self.novel_settings.tone));
+        rendered.push_str(&format!("premise = {:?}\n", self.novel_settings.premise));
+        rendered.push_str(&format!(
+            "protagonist_name = {:?}\n",
+            self.novel_settings.protagonist_name
+        ));
+        rendered.push_str(&format!(
+            "chapter_scene_target = {}\n",
+            self.novel_settings.chapter_scene_target.max(1)
+        ));
+        Ok(rendered)
     }
 }
 
@@ -206,6 +231,8 @@ pub struct NovelSettings {
     pub premise: String,
     #[serde(default)]
     pub protagonist_name: String,
+    #[serde(default = "default_chapter_scene_target")]
+    pub chapter_scene_target: u32,
 }
 
 impl Default for NovelSettings {
@@ -219,6 +246,7 @@ impl Default for NovelSettings {
             tone: default_tone(),
             premise: String::new(),
             protagonist_name: String::new(),
+            chapter_scene_target: default_chapter_scene_target(),
         }
     }
 }
@@ -248,6 +276,10 @@ impl NovelSettings {
 
         missing
     }
+}
+
+fn default_chapter_scene_target() -> u32 {
+    3
 }
 
 fn load_toml_or_default<T>(path: &Path) -> Result<T>
