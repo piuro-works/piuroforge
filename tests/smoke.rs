@@ -6,6 +6,7 @@ use heeforge::novel_backend::{
 };
 use heeforge::utils::markdown::render_scene;
 use heeforge::{Config, NovelEngine};
+use serde_json::Value;
 use std::sync::Arc;
 use tempfile::tempdir;
 
@@ -213,12 +214,30 @@ fn review_and_rewrite_persist_artifacts() -> Result<()> {
     let original_snapshot = std::fs::read_to_string(history_dir.join("rewrite_001_original.md"))?;
     let rewritten_snapshot = std::fs::read_to_string(history_dir.join("rewrite_001_rewritten.md"))?;
     let record = std::fs::read_to_string(history_dir.join("rewrite_001.json"))?;
+    let record_json: Value = serde_json::from_str(&record)?;
     assert!(original_snapshot.contains(original.text.lines().next().unwrap_or_default()));
     assert!(rewritten_snapshot.contains("The revision now leans harder into"));
     assert!(record.contains(
         "\"original_snapshot_path\": \"06_Review/Revisions/scene_001_001/rewrite_001_original.md\""
     ));
     assert!(record.contains("\"rewritten_snapshot_path\": \"06_Review/Revisions/scene_001_001/rewrite_001_rewritten.md\""));
+    assert_eq!(
+        record_json["source_review_score"].as_u64(),
+        Some(issues.value.score as u64)
+    );
+    assert!(record_json["post_rewrite_review_score"].is_null());
+
+    let revised_review = engine.review_current_scene()?;
+    let updated_record = std::fs::read_to_string(history_dir.join("rewrite_001.json"))?;
+    let updated_record_json: Value = serde_json::from_str(&updated_record)?;
+    assert_eq!(
+        updated_record_json["source_review_score"].as_u64(),
+        Some(issues.value.score as u64)
+    );
+    assert_eq!(
+        updated_record_json["post_rewrite_review_score"].as_u64(),
+        Some(revised_review.value.score as u64)
+    );
 
     Ok(())
 }

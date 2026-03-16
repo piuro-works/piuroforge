@@ -287,6 +287,10 @@ pub struct RewriteRecord {
     pub instruction: String,
     pub revision: u32,
     #[serde(default)]
+    pub source_review_score: Option<u32>,
+    #[serde(default)]
+    pub post_rewrite_review_score: Option<u32>,
+    #[serde(default)]
     pub editor_fallback_warning: Option<String>,
     pub original_snapshot_path: String,
     pub rewritten_snapshot_path: String,

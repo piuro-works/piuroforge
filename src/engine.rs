@@ -170,12 +170,18 @@ impl NovelEngine {
             &reviewed.issues,
             reviewed.critic_fallback_warning,
         )?;
+        let mut warnings = reviewed.warnings;
+        if let Err(error) = self.backfill_post_rewrite_review_score(&scene_id, reviewed.score) {
+            warnings.push(format!(
+                "could not update rewrite metadata with post-review score: {error}"
+            ));
+        }
         Ok(OperationResult {
             value: ReviewOutcome {
                 score: reviewed.score,
                 issues: reviewed.issues,
             },
-            warnings: reviewed.warnings,
+            warnings,
         })
     }
 
@@ -204,6 +210,16 @@ impl NovelEngine {
         let rewritten_snapshot_path = self.rewrite_snapshot_path(scene_id, revision, "rewritten");
         write_string(&original_snapshot_path, &render_scene(&existing_scene))?;
         let rewritten_scene = rewritten.rewritten_scene;
+        let mut warnings = rewritten.warnings;
+        let source_review_score = match self.load_review_score(scene_id) {
+            Ok(score) => score,
+            Err(error) => {
+                warnings.push(format!(
+                    "could not read latest review score for rewrite metadata: {error}"
+                ));
+                None
+            }
+        };
 
         self.save_scene(&rewritten_scene)?;
         write_string(&rewritten_snapshot_path, &render_scene(&rewritten_scene))?;
@@ -212,6 +228,8 @@ impl NovelEngine {
             scene_id: scene_id.to_string(),
             instruction: instruction.to_string(),
             revision,
+            source_review_score,
+            post_rewrite_review_score: None,
             editor_fallback_warning: rewritten.editor_fallback_warning,
             original_snapshot_path: self.workspace_relative_path(&original_snapshot_path),
             rewritten_snapshot_path: self.workspace_relative_path(&rewritten_snapshot_path),
@@ -230,7 +248,7 @@ impl NovelEngine {
 
         Ok(OperationResult {
             value: rewritten_scene,
-            warnings: rewritten.warnings,
+            warnings,
         })
     }
 
@@ -520,6 +538,36 @@ impl NovelEngine {
         write_string(&path, &content)
     }
 
+    fn load_review_score(&self, scene_id: &str) -> Result<Option<u32>> {
+        let path = self.review_report_path(scene_id);
+        if !path.exists() {
+            return Ok(None);
+        }
+
+        let content = read_string(&path)?;
+        let report: ReviewReport = serde_json::from_str(&content)
+            .with_context(|| format!("failed to parse {}", path.display()))?;
+        Ok(Some(report.score))
+    }
+
+    fn backfill_post_rewrite_review_score(&self, scene_id: &str, score: u32) -> Result<()> {
+        let Some(path) = self.latest_rewrite_record_path(scene_id)? else {
+            return Ok(());
+        };
+
+        let content = read_string(&path)?;
+        let mut record: RewriteRecord = serde_json::from_str(&content)
+            .with_context(|| format!("failed to parse {}", path.display()))?;
+        if record.post_rewrite_review_score.is_some() {
+            return Ok(());
+        }
+
+        record.post_rewrite_review_score = Some(score);
+        let content =
+            serde_json::to_string_pretty(&record).context("failed to serialize rewrite record")?;
+        write_string(&path, &content)
+    }
+
     fn save_scene(&self, scene: &Scene) -> Result<PathBuf> {
         let path = self.scene_write_path(scene);
         let markdown = render_scene(scene);
@@ -689,6 +737,48 @@ impl NovelEngine {
         }
 
         Ok(max_revision + 1)
+    }
+
+    fn latest_rewrite_record_path(&self, scene_id: &str) -> Result<Option<PathBuf>> {
+        let mut latest: Option<(u32, PathBuf)> = None;
+        for dir in [
+            self.legacy_rewrite_history_dir(scene_id),
+            self.rewrite_history_dir(scene_id),
+        ] {
+            if !dir.exists() {
+                continue;
+            }
+
+            for entry in
+                fs::read_dir(&dir).with_context(|| format!("failed to read {}", dir.display()))?
+            {
+                let entry =
+                    entry.with_context(|| format!("failed to inspect {}", dir.display()))?;
+                let Some(file_name) = entry.file_name().to_str().map(|value| value.to_string())
+                else {
+                    continue;
+                };
+                if !file_name.ends_with(".json") {
+                    continue;
+                }
+
+                let Some(number) = file_name
+                    .strip_prefix("rewrite_")
+                    .and_then(|value| value.strip_suffix(".json"))
+                    .and_then(|value| value.parse::<u32>().ok())
+                else {
+                    continue;
+                };
+
+                let path = entry.path();
+                match &latest {
+                    Some((latest_number, _)) if *latest_number >= number => {}
+                    _ => latest = Some((number, path)),
+                }
+            }
+        }
+
+        Ok(latest.map(|(_, path)| path))
     }
 
     fn rewrite_snapshot_path(&self, scene_id: &str, revision: u32, kind: &str) -> PathBuf {

@@ -751,6 +751,9 @@ fn rewrite_json_output_preserves_history_and_updates_scene() -> Result<()> {
     assert!(history_dir.join("rewrite_001_original.md").exists());
     assert!(history_dir.join("rewrite_001_rewritten.md").exists());
     assert!(history_dir.join("rewrite_001.json").exists());
+    let rewrite_record = std::fs::read_to_string(history_dir.join("rewrite_001.json"))?;
+    assert!(rewrite_record.contains("\"source_review_score\": null"));
+    assert!(rewrite_record.contains("\"post_rewrite_review_score\": null"));
 
     Ok(())
 }
