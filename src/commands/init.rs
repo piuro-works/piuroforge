@@ -101,6 +101,8 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
             engine.workspace_dir(),
             "Novel workspace initialized and ready for scene generation.",
         )
+        .next_step("codex login")
+        .next_step(format!("Open {}", engine.global_config_path().display()))
         .next_step(super::workspace_command(engine, "next-scene"));
         if engine.workspace_auto_commit_enabled() {
             output
@@ -130,6 +132,10 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
         .detail(
             "global_config",
             engine.global_config_path().display().to_string(),
+        )
+        .detail(
+            "writer_setup",
+            "Run `codex login` once before your first real scene. Leave dummy fallback off unless you intentionally want placeholder text.",
         )
         .detail(
             "workspace_config",

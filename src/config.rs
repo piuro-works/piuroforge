@@ -114,7 +114,38 @@ impl Config {
     }
 
     pub fn render_global_config(&self) -> Result<String> {
-        toml::to_string_pretty(&self.global_settings).context("failed to serialize global config")
+        Ok(format!(
+            "# HeeForge global settings\n\
+#\n\
+# First run for writers:\n\
+# 1. Open a terminal once and run: codex login\n\
+# 2. Leave allow_dummy_fallback = false for real drafting\n\
+# 3. Turn allow_dummy_fallback = true on only if you intentionally want placeholder text for workflow testing\n\
+# 4. Turn workspace_auto_commit = true on if you want Git history created automatically inside each novel workspace\n\
+#\n\
+# If HeeForge shows `codex_unavailable`, the usual causes are:\n\
+# - codex login has not been completed yet\n\
+# - this machine cannot reach the Codex service because of internet, DNS, VPN, or proxy issues\n\
+\n\
+version = {version}\n\
+codex_command = {codex_command:?}\n\
+codex_timeout_secs = {codex_timeout_secs}\n\
+allow_dummy_fallback = {allow_dummy_fallback}\n\
+log_prompts = {log_prompts}\n\
+workspace_auto_commit = {workspace_auto_commit}\n\
+default_language = {default_language:?}\n\
+{default_workspace_root}",
+            version = self.global_settings.version,
+            codex_command = self.global_settings.codex_command,
+            codex_timeout_secs = self.global_settings.codex_timeout_secs,
+            allow_dummy_fallback = self.global_settings.allow_dummy_fallback,
+            log_prompts = self.global_settings.log_prompts,
+            workspace_auto_commit = self.global_settings.workspace_auto_commit,
+            default_language = self.global_settings.default_language,
+            default_workspace_root = render_default_workspace_root(
+                self.global_settings.default_workspace_root.as_deref(),
+            ),
+        ))
     }
 
     pub fn render_workspace_config(&self) -> Result<String> {
@@ -315,6 +346,15 @@ fn default_log_prompts() -> bool {
 
 fn default_workspace_auto_commit() -> bool {
     false
+}
+
+fn render_default_workspace_root(value: Option<&str>) -> String {
+    match value {
+        Some(value) if !value.trim().is_empty() => {
+            format!("default_workspace_root = {:?}\n", value.trim())
+        }
+        _ => String::new(),
+    }
 }
 
 fn default_genre() -> String {

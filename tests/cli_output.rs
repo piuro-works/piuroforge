@@ -96,6 +96,10 @@ fn init_json_creates_ready_workspace_without_prompting() -> Result<()> {
         &workspace,
     )?;
     assert_eq!(detail_value(&payload, "title"), Some("Fresh Novel"));
+    assert_eq!(
+        detail_value(&payload, "writer_setup"),
+        Some("Run `codex login` once before your first real scene. Leave dummy fallback off unless you intentionally want placeholder text.")
+    );
     assert!(workspace.join("novel.toml").exists());
     assert!(workspace.join("README.md").exists());
     assert!(workspace.join("98_Templates/Scene Template.md").exists());

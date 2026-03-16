@@ -65,6 +65,16 @@ curl -fsSL https://raw.githubusercontent.com/johwanghee/heeforge/main/install.sh
 기본적으로 `codex exec` 호출은 120초 timeout이 걸려 있으며, 응답이 없으면 subprocess를 종료하고 명확한 에러를 반환한다.
 기본값에서는 `codex` 실패가 조용히 placeholder prose로 바뀌지 않는다. placeholder output이 필요하면 전역 설정 `allow_dummy_fallback = true` 또는 `HEEFORGE_ALLOW_DUMMY=true`를 사용자가 직접 켜야 하고, 그 경우에도 CLI 출력과 로그에 fallback warning이 남는다.
 
+작가용 최소 설정 순서:
+
+1. 터미널에서 한 번 `codex login` 실행
+2. `heeforge init <workspace>` 실행
+3. 필요하면 `~/.config/heeforge/config.toml` 열기
+4. 실제 집필은 `allow_dummy_fallback = false` 유지
+5. 폴더 흐름만 시험하고 싶을 때만 `allow_dummy_fallback = true` 사용
+
+`codex_unavailable`가 나오면 대부분은 로그인 미완료 또는 인터넷/DNS/VPN/프록시 문제다. 이 경우 개발 지식보다도 먼저 `codex login`과 네트워크 상태를 확인하는 쪽이 맞다.
+
 ## 빌드
 
 ```bash

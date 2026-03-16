@@ -193,23 +193,20 @@ impl ErrorOutput {
         }
 
         if looks_like_codex_error(&reason) {
-            let mut remediation = vec![
-                "Run: codex login".to_string(),
-                "Verify that the codex binary is installed and available on PATH.".to_string(),
-            ];
+            let mut remediation = vec!["Open a terminal and run: codex login".to_string()];
             if looks_like_network_error(&reason) {
                 remediation.push(
-                    "Check the current network, DNS, proxy, or VPN path before retrying codex."
+                    "If login is already done, check the internet connection, DNS, VPN, or proxy on this machine before retrying."
                         .to_string(),
                 );
             } else {
                 remediation.push(
-                    "Retry after confirming the codex session is healthy and can reach its backend."
+                    "Retry after confirming that Codex can open normally on this machine."
                         .to_string(),
                 );
             }
             remediation.push(
-                "If you intentionally want placeholder output, opt in with `allow_dummy_fallback = true` in ~/.config/heeforge/config.toml or `HEEFORGE_ALLOW_DUMMY=true`."
+                "If you only want to test the writing workflow without live Codex, open ~/.config/heeforge/config.toml and set allow_dummy_fallback = true. HeeForge will then mark placeholder output with warnings."
                     .to_string(),
             );
             remediation.push(example_for(command, workspace));

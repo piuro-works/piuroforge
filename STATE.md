@@ -11,6 +11,7 @@
 - `heeforge init`은 소설 워크스페이스용 `.gitignore`를 생성해 엔진 Git과 소설 Git 분리를 돕는다.
 - `heeforge init`은 `00_Inbox`, `02_Draft`, `03_StoryBible`, `06_Review`, `07_Archive`, `98_Templates`를 포함한 사람용 작업 스캐폴드를 생성한다.
 - `heeforge init`은 루트/섹션 `README.md`와 `98_Templates` starter template 파일도 생성한다.
+- 전역 `config.toml` 생성 내용이 작가용 first-run 설명과 codex/dummy fallback 안내를 포함하도록 보강됐다.
 - scene markdown는 stable `scene_id`를 앞에 유지한 slugged filename으로 저장되며, slug는 scene `short_title` 기준으로 생성된다.
 - chapter markdown는 compiled `short_title`을 포함하고 slugged filename으로 저장된다.
 - 설정 계층이 `~/.config/heeforge/config.toml`, `<workspace>/novel.toml`, `<workspace>/.novel/workspace.json`으로 분리됐다.
@@ -28,6 +29,7 @@
 - opt-in workspace Git auto-commit이 추가되어, 켜면 workspace repo를 자동 초기화하고 변경 명령 뒤에 자동 commit을 남긴다.
 - `next-scene`, `review`, `rewrite`, `expand-world`는 dummy fallback이 발생하면 성공 응답에도 warning을 노출한다.
 - codex 실패 에러 출력은 로그인 문제와 네트워크/transport 문제를 구분해 remediation을 안내하고, opt-in dummy fallback 설정 경로도 보여준다.
+- `init` 출력과 workspace root `README.md`는 `codex login`, dummy fallback, workspace auto-commit 설정 순서를 비개발자 기준으로 안내한다.
 - planner/writer/editor/critic 프롬프트 템플릿이 `src/prompts/`로 분리됐다.
 - scene 생성 로그는 `.novel/logs/`에, review JSON과 rewrite snapshot은 `06_Review/`에 저장된다.
 - `next-chapter`는 scene 번호 연속성을 검증한다.

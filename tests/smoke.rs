@@ -16,6 +16,8 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
 
     assert!(temp_dir.path().join("config-home/config.toml").exists());
     let global_config = std::fs::read_to_string(temp_dir.path().join("config-home/config.toml"))?;
+    assert!(global_config.contains("# HeeForge global settings"));
+    assert!(global_config.contains("codex login"));
     assert!(global_config.contains("codex_command = \"codex\""));
     assert!(global_config.contains("allow_dummy_fallback = false"));
     assert!(global_config.contains("log_prompts = false"));
@@ -33,6 +35,8 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
     assert!(workspace_config.contains("title = \"Demo Novel\""));
     let workspace_readme = std::fs::read_to_string(workspace.join("README.md"))?;
     assert!(workspace_readme.contains("This workspace separates human-facing manuscript files"));
+    assert!(workspace_readme.contains("First Run Checklist"));
+    assert!(workspace_readme.contains("allow_dummy_fallback = false"));
     let draft_readme = std::fs::read_to_string(workspace.join("02_Draft/README.md"))?;
     assert!(draft_readme.contains("Human-facing manuscript work lives here."));
     let template = std::fs::read_to_string(workspace.join("98_Templates/Scene Template.md"))?;
