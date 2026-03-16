@@ -91,7 +91,7 @@ curl -fsSL https://raw.githubusercontent.com/piuro-works/piuroforge/main/install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/piuro-works/piuroforge/main/install.sh | \
-  PIUROFORGE_VERSION=v2.0.0 bash
+  PIUROFORGE_VERSION=v1.1.0 bash
 ```
 
 설치 스크립트는 현재 플랫폼을 감지하고 GitHub Releases에서 `piuroforge-<target>.tar.gz` 자산을 내려받는다.
