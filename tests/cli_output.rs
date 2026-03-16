@@ -420,11 +420,19 @@ fn review_json_output_is_structured() -> Result<()> {
     assert_eq!(payload["status"], "ok");
     assert_eq!(payload["command"], "review");
     assert_eq!(detail_value(&payload, "scene_id"), Some("scene_001_001"));
+    let score = detail_value(&payload, "score")
+        .unwrap_or("0")
+        .parse::<u32>()?;
+    assert!(score <= 100);
     assert!(warning_contains(&payload, "critic used dummy fallback"));
     let issue_count = detail_value(&payload, "issue_count")
         .unwrap_or("0")
         .parse::<u32>()?;
     assert!(issue_count >= 1);
+    assert!(payload["body"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("Score:"));
     assert!(payload["body"].as_str().unwrap_or_default().contains("1."));
     assert!(workspace
         .join("06_Review/Feedback/scene_001_001.json")

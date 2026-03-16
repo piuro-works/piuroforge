@@ -9,8 +9,8 @@ use crate::codex_runner::CodexRunner;
 use crate::config::Config;
 use crate::memory_manager::MemoryManager;
 use crate::models::{
-    derive_short_title, slug_fragment, MemoryBundle, OperationResult, ReviewIssue, ReviewReport,
-    RewriteRecord, Scene, SceneGenerationLog, StoryState, WorkspaceManifest,
+    derive_short_title, slug_fragment, MemoryBundle, OperationResult, ReviewIssue, ReviewOutcome,
+    ReviewReport, RewriteRecord, Scene, SceneGenerationLog, StoryState, WorkspaceManifest,
 };
 use crate::novel_backend::{
     CodexNovelBackend, NovelBackend, ReviewRequest, RewriteRequest, SceneGenerationRequest,
@@ -132,7 +132,7 @@ impl NovelEngine {
         })
     }
 
-    pub fn review_current_scene(&self) -> Result<OperationResult<Vec<ReviewIssue>>> {
+    pub fn review_current_scene(&self) -> Result<OperationResult<ReviewOutcome>> {
         self.init_project()?;
 
         let state = self.state_manager.load_state()?;
@@ -152,11 +152,15 @@ impl NovelEngine {
 
         self.save_review_report(
             &scene_id,
+            reviewed.score,
             &reviewed.issues,
             reviewed.critic_fallback_warning,
         )?;
         Ok(OperationResult {
-            value: reviewed.issues,
+            value: ReviewOutcome {
+                score: reviewed.score,
+                issues: reviewed.issues,
+            },
             warnings: reviewed.warnings,
         })
     }
@@ -463,12 +467,14 @@ impl NovelEngine {
     fn save_review_report(
         &self,
         scene_id: &str,
+        score: u32,
         issues: &[ReviewIssue],
         critic_fallback_warning: Option<String>,
     ) -> Result<()> {
         let report = ReviewReport {
             timestamp_unix_secs: unix_timestamp_secs(),
             scene_id: scene_id.to_string(),
+            score,
             critic_fallback_warning,
             issues: issues.to_vec(),
         };

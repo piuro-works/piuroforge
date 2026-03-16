@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 
 use crate::agents::base::{fallback_warning, Agent, AgentContext, AgentRun};
 use crate::codex_runner::CodexRunner;
+use crate::models::{review_score_from_issue_count, ReviewIssue};
 use crate::prompts::{render_template, CRITIC_TEMPLATE};
 
 #[derive(Debug, Clone)]
@@ -46,9 +47,14 @@ impl CriticAgent {
         let mut issues = Vec::new();
 
         if scene.text.len() < 250 {
-            issues.push(
-                r#"{"issue_type":"pacing","description":"The scene is compact; consider adding one sensory beat or emotional reaction.","line_start":1,"line_end":3}"#,
-            );
+            issues.push(ReviewIssue {
+                issue_type: "pacing".to_string(),
+                description:
+                    "The scene is compact; consider adding one sensory beat or emotional reaction."
+                        .to_string(),
+                line_start: Some(1),
+                line_end: Some(3),
+            });
         }
 
         if !scene
@@ -56,18 +62,30 @@ impl CriticAgent {
             .to_ascii_lowercase()
             .contains(&scene.conflict.to_ascii_lowercase())
         {
-            issues.push(
-                r#"{"issue_type":"clarity","description":"The conflict stated in the plan is not fully visible in the prose.","line_start":2,"line_end":6}"#,
-            );
+            issues.push(ReviewIssue {
+                issue_type: "clarity".to_string(),
+                description: "The conflict stated in the plan is not fully visible in the prose."
+                    .to_string(),
+                line_start: Some(2),
+                line_end: Some(6),
+            });
         }
 
         if issues.is_empty() {
-            issues.push(
-                r#"{"issue_type":"style","description":"The draft is serviceable, but one sharper closing image would strengthen the ending.","line_start":4,"line_end":6}"#,
-            );
+            issues.push(ReviewIssue {
+                issue_type: "style".to_string(),
+                description: "The draft is serviceable, but one sharper closing image would strengthen the ending."
+                    .to_string(),
+                line_start: Some(4),
+                line_end: Some(6),
+            });
         }
 
-        Ok(format!("[{}]", issues.join(",")))
+        Ok(serde_json::json!({
+            "score": review_score_from_issue_count(issues.len()),
+            "issues": issues,
+        })
+        .to_string())
     }
 }
 

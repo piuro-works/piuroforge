@@ -156,9 +156,11 @@ fn review_and_rewrite_persist_artifacts() -> Result<()> {
     let original = engine.generate_next_scene()?.value;
 
     let issues = engine.review_current_scene()?;
-    assert!(!issues.value.is_empty());
+    assert!(!issues.value.issues.is_empty());
+    assert!(issues.value.score <= 100);
     let report = std::fs::read_to_string(workspace.join("06_Review/Feedback/scene_001_001.json"))?;
     assert!(report.contains("\"scene_id\": \"scene_001_001\""));
+    assert!(report.contains("\"score\""));
     assert!(report.contains("\"critic_fallback_warning\""));
 
     let rewritten = engine
@@ -357,6 +359,7 @@ impl NovelBackend for StubBackend {
 
     fn review_scene(&self, _request: ReviewRequest) -> Result<ReviewResponse> {
         Ok(ReviewResponse {
+            score: 100,
             issues: Vec::new(),
             critic_fallback_warning: None,
             warnings: Vec::new(),

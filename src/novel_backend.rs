@@ -7,7 +7,10 @@ use crate::agents::planner::PlannerAgent;
 use crate::agents::writer::WriterAgent;
 use crate::codex_runner::CodexRunner;
 use crate::config::NovelSettings;
-use crate::models::{MemoryBundle, ReviewIssue, Scene, ScenePlan, StoryState};
+use crate::models::{
+    normalize_review_score, review_score_from_issue_count, MemoryBundle, ReviewIssue,
+    ReviewOutcome, Scene, ScenePlan, StoryState,
+};
 
 pub trait NovelBackend {
     fn generate_scene(&self, request: SceneGenerationRequest) -> Result<SceneGenerationResponse>;
@@ -50,6 +53,7 @@ pub struct ReviewRequest {
 
 #[derive(Debug, Clone)]
 pub struct ReviewResponse {
+    pub score: u32,
     pub issues: Vec<ReviewIssue>,
     pub critic_fallback_warning: Option<String>,
     pub warnings: Vec<String>,
@@ -195,8 +199,11 @@ impl NovelBackend for CodexNovelBackend {
             warnings.push(warning);
         }
 
+        let outcome = parse_review_outcome(&run.output);
+
         Ok(ReviewResponse {
-            issues: parse_review_issues(&run.output),
+            score: outcome.score,
+            issues: outcome.issues,
             critic_fallback_warning: run.fallback_warning,
             warnings,
         })
@@ -298,16 +305,46 @@ fn parse_scene_plan(raw: &str, chapter: u32, scene_number: u32) -> ScenePlan {
     plan
 }
 
-fn parse_review_issues(raw: &str) -> Vec<ReviewIssue> {
+fn parse_review_outcome(raw: &str) -> ReviewOutcome {
     let cleaned = strip_code_fences(raw);
-    serde_json::from_str::<Vec<ReviewIssue>>(&cleaned).unwrap_or_else(|_| {
-        vec![ReviewIssue {
-            issue_type: "analysis".to_string(),
-            description: cleaned,
-            line_start: None,
-            line_end: None,
-        }]
-    })
+
+    #[derive(serde::Deserialize)]
+    struct ReviewPayload {
+        #[serde(default)]
+        score: Option<u32>,
+        #[serde(default)]
+        issues: Vec<ReviewIssue>,
+    }
+
+    if let Ok(payload) = serde_json::from_str::<ReviewPayload>(&cleaned) {
+        let score = payload
+            .score
+            .map(normalize_review_score)
+            .unwrap_or_else(|| review_score_from_issue_count(payload.issues.len()));
+        return ReviewOutcome {
+            score,
+            issues: payload.issues,
+        };
+    }
+
+    if let Ok(issues) = serde_json::from_str::<Vec<ReviewIssue>>(&cleaned) {
+        return ReviewOutcome {
+            score: review_score_from_issue_count(issues.len()),
+            issues,
+        };
+    }
+
+    let issues = vec![ReviewIssue {
+        issue_type: "analysis".to_string(),
+        description: cleaned,
+        line_start: None,
+        line_end: None,
+    }];
+
+    ReviewOutcome {
+        score: review_score_from_issue_count(issues.len()),
+        issues,
+    }
 }
 
 fn compact_error_message(error: &anyhow::Error) -> String {
@@ -330,5 +367,32 @@ fn truncate_chars(value: &str, max_chars: usize) -> String {
         rendered
     } else {
         format!("{}...", rendered.trim_end())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_review_outcome;
+
+    #[test]
+    fn parse_review_outcome_reads_object_score() {
+        let outcome = parse_review_outcome(
+            r#"{"score":82,"issues":[{"issue_type":"pacing","description":"Tighten the middle.","line_start":3,"line_end":5}]}"#,
+        );
+
+        assert_eq!(outcome.score, 82);
+        assert_eq!(outcome.issues.len(), 1);
+        assert_eq!(outcome.issues[0].issue_type, "pacing");
+    }
+
+    #[test]
+    fn parse_review_outcome_keeps_array_compatibility() {
+        let outcome = parse_review_outcome(
+            r#"[{"issue_type":"logic","description":"Clarify the leap.","line_start":7,"line_end":9}]"#,
+        );
+
+        assert_eq!(outcome.score, 88);
+        assert_eq!(outcome.issues.len(), 1);
+        assert_eq!(outcome.issues[0].issue_type, "logic");
     }
 }

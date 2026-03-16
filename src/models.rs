@@ -131,6 +131,32 @@ pub struct ReviewIssue {
     pub line_end: Option<u32>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReviewOutcome {
+    #[serde(default = "perfect_review_score")]
+    pub score: u32,
+    #[serde(default)]
+    pub issues: Vec<ReviewIssue>,
+}
+
+pub fn perfect_review_score() -> u32 {
+    100
+}
+
+pub fn normalize_review_score(score: u32) -> u32 {
+    score.min(perfect_review_score())
+}
+
+pub fn review_score_from_issue_count(issue_count: usize) -> u32 {
+    if issue_count == 0 {
+        return perfect_review_score();
+    }
+
+    let primary_penalty = issue_count.min(3) as u32 * 12;
+    let secondary_penalty = issue_count.saturating_sub(3) as u32 * 8;
+    perfect_review_score().saturating_sub(primary_penalty + secondary_penalty)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct MemoryBundle {
     pub core_memory: String,
@@ -211,6 +237,8 @@ pub struct SceneGenerationLog {
 pub struct ReviewReport {
     pub timestamp_unix_secs: u64,
     pub scene_id: String,
+    #[serde(default = "perfect_review_score")]
+    pub score: u32,
     #[serde(default)]
     pub critic_fallback_warning: Option<String>,
     pub issues: Vec<ReviewIssue>,
