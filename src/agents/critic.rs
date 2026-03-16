@@ -22,6 +22,11 @@ impl CriticAgent {
             .as_ref()
             .ok_or_else(|| anyhow!("critic requires a scene"))?;
         let bundle_role = scene.effective_bundle_role(context.novel.bundle_scene_target);
+        let scene_length_guidance = if context.novel.serialized_workflow {
+            "serialized episode mode expects roughly 1800-2600 Korean characters unless a short punchy beat is clearly intentional"
+        } else {
+            "compact draft mode expects roughly 800-1200 Korean characters unless there is a clear reason to go shorter or longer"
+        };
 
         Ok(render_template(
             CRITIC_TEMPLATE,
@@ -35,6 +40,7 @@ impl CriticAgent {
                 ("goal", scene.goal.as_str()),
                 ("conflict", scene.conflict.as_str()),
                 ("outcome", scene.outcome.as_str()),
+                ("scene_length_guidance", scene_length_guidance),
                 ("story_foundation", context.story_foundation.as_str()),
                 ("text", scene.text.as_str()),
             ],

@@ -23,7 +23,7 @@ Style requirements:
 - ally speech can be more emotionally expansive only if the character bible supports it
 - antagonist speech should reveal contempt or pressure through wording, not cartoonish monologue
 - weave action beats between dialogue turns
-- target roughly 800-1200 Korean characters for the scene body
+- {{scene_length_guidance}}
 - if this is the cliffhanger scene, end on forward pull rather than explanation
 
 Story foundation:

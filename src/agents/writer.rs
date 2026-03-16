@@ -23,6 +23,11 @@ impl WriterAgent {
 
         let scene_id = plan.scene_id();
         let bundle_role = plan.effective_bundle_role(context.novel.bundle_scene_target);
+        let scene_length_guidance = if context.novel.serialized_workflow {
+            "serialized episode mode: target roughly 1800-2600 Korean characters for the scene body unless a deliberate ultra-short beat is explicitly justified"
+        } else {
+            "target roughly 800-1200 Korean characters for the scene body"
+        };
         Ok(render_template(
             WRITER_TEMPLATE,
             &[
@@ -41,6 +46,7 @@ impl WriterAgent {
                 ("goal", plan.goal.as_str()),
                 ("conflict", plan.conflict.as_str()),
                 ("outcome", plan.outcome.as_str()),
+                ("scene_length_guidance", scene_length_guidance),
                 ("story_foundation", context.story_foundation.as_str()),
                 ("core_memory", context.memory.core_memory.as_str()),
                 ("story_memory", context.memory.story_memory.as_str()),

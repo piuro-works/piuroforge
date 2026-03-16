@@ -23,6 +23,7 @@ Critique priorities:
 - dialogue voices collapsing into the same tone
 - bundle-role failure: incident too weak, escalation too flat, or cliffhanger without pull
 - scene length or density feeling clearly undercooked or bloated
+- length expectation: {{scene_length_guidance}}
 
 Story foundation:
 {{story_foundation}}

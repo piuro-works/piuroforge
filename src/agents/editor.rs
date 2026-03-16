@@ -25,6 +25,11 @@ impl EditorAgent {
             .clone()
             .unwrap_or_else(|| "Tighten repetition and polish sentence flow.".to_string());
         let bundle_role = scene.effective_bundle_role(context.novel.bundle_scene_target);
+        let scene_length_guidance = if context.novel.serialized_workflow {
+            "serialized episode mode: preserve or expand toward roughly 1800-2600 Korean characters unless the scene is intentionally compressed"
+        } else {
+            "preserve a compact scene shape around roughly 800-1200 Korean characters unless the material clearly needs more room"
+        };
 
         Ok(render_template(
             EDITOR_TEMPLATE,
@@ -38,6 +43,7 @@ impl EditorAgent {
                 ("goal", scene.goal.as_str()),
                 ("conflict", scene.conflict.as_str()),
                 ("outcome", scene.outcome.as_str()),
+                ("scene_length_guidance", scene_length_guidance),
                 ("story_foundation", context.story_foundation.as_str()),
                 ("text", scene.text.as_str()),
             ],

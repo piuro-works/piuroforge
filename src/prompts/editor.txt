@@ -19,6 +19,7 @@ Editing priorities:
 - keep each speaker's voice distinct and consistent with the character bible
 - keep the scene aligned with its bundle role: incident, escalation, or cliffhanger
 - do not flatten the prose into one uniform sentence length
+- {{scene_length_guidance}}
 
 Story foundation:
 {{story_foundation}}
