@@ -263,7 +263,10 @@ fn run(cli: Cli) -> Result<CommandOutput> {
             let config = Config::new(workspace)?;
             commands::doctor::run(&config)
         }
-        NovelCommand::Capabilities => commands::capabilities::run(&workspace),
+        NovelCommand::Capabilities => {
+            let config = Config::new(workspace)?;
+            commands::capabilities::run(&config)
+        }
         NovelCommand::NextScene => {
             let engine = NovelEngine::new(Config::new(workspace)?)?;
             commands::next_scene::run(&engine)

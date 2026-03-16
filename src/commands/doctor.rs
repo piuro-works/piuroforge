@@ -4,7 +4,7 @@ use std::process::Command;
 use std::time::Duration;
 
 use crate::codex_runner::CodexRunner;
-use crate::config::Config;
+use crate::config::{Config, SUPPORTED_LLM_BACKENDS};
 use crate::output::CommandOutput;
 
 pub fn run(config: &Config) -> Result<CommandOutput> {
@@ -131,8 +131,10 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
     };
 
     let mut output = CommandOutput::ok("doctor", &config.workspace_dir, summary)
+        .detail("llm_backend", &config.llm_backend)
         .detail("auth_mode", "codex_cli")
         .detail("setup_flow", "init_then_doctor")
+        .detail("supported_llm_backends", SUPPORTED_LLM_BACKENDS.join(", "))
         .detail(
             "workspace_ready",
             yes_no(workspace_manifest_exists && workspace_config_exists),
@@ -180,6 +182,7 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
     }
 
     output = output.body(render_doctor_body(
+        &config.llm_backend,
         workspace_manifest_exists,
         workspace_config_exists,
         &missing_fields,
@@ -257,6 +260,7 @@ fn render_missing_fields(missing_fields: &[&str]) -> String {
 }
 
 fn render_doctor_body(
+    llm_backend: &str,
     workspace_manifest_exists: bool,
     workspace_config_exists: bool,
     missing_fields: &[&str],
@@ -291,7 +295,7 @@ fn render_doctor_body(
     };
 
     format!(
-        "HeeForge Doctor\n\n- Workspace: {workspace_state}\n- Novel config: {config_state}\n- Codex: {codex_state}\n- Fallback: {fallback_state}\n- Workspace Git auto-commit: {git_state}\n\nIf Doctor says ready, HeeForge setup is finished and you can move on to `heeforge next-scene`.\n\nIf you run HeeForge through another assistant, IDE agent, or sandboxed tool, that host may still ask for its own approval prompts. Those prompts are outside HeeForge."
+        "HeeForge Doctor\n\n- LLM backend: {llm_backend}\n- Workspace: {workspace_state}\n- Novel config: {config_state}\n- Codex: {codex_state}\n- Fallback: {fallback_state}\n- Workspace Git auto-commit: {git_state}\n\nIf Doctor says ready, HeeForge setup is finished and you can move on to `heeforge next-scene`.\n\nIf you run HeeForge through another assistant, IDE agent, or sandboxed tool, that host may still ask for its own approval prompts. Those prompts are outside HeeForge."
     )
 }
 

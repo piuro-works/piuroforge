@@ -45,6 +45,7 @@ fn capabilities_json_reports_agent_contract() -> Result<()> {
     assert_eq!(payload["schema_version"], 1);
     assert_eq!(payload["agent_mode"], true);
     assert_eq!(payload["command"], "capabilities");
+    assert_eq!(detail_value(&payload, "llm_backend"), Some("codex_cli"));
     assert_eq!(detail_value(&payload, "auth_mode"), Some("codex_cli"));
     assert_eq!(
         detail_value(&payload, "setup_flow"),
@@ -57,6 +58,13 @@ fn capabilities_json_reports_agent_contract() -> Result<()> {
         "heeforge --format json --agent <command>"
     );
     assert_eq!(payload["data"]["auth_mode"], "codex_cli");
+    assert_eq!(payload["data"]["selected_backend"], "codex_cli");
+    assert!(payload["data"]["supported_backends"].is_array());
+    assert!(payload["data"]["supported_backends"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .any(|item| item["name"] == "codex_cli"));
     assert!(payload["data"]["commands"].is_array());
     assert!(payload["data"]["commands"]
         .as_array()
@@ -156,6 +164,7 @@ fn doctor_json_reports_setup_issues_without_workspace() -> Result<()> {
     let payload: Value = serde_json::from_str(&stdout)?;
     assert_eq!(payload["status"], "ok");
     assert_eq!(payload["command"], "doctor");
+    assert_eq!(detail_value(&payload, "llm_backend"), Some("codex_cli"));
     assert_eq!(detail_value(&payload, "auth_mode"), Some("codex_cli"));
     assert_eq!(
         detail_value(&payload, "setup_flow"),
@@ -164,6 +173,10 @@ fn doctor_json_reports_setup_issues_without_workspace() -> Result<()> {
     assert_eq!(detail_value(&payload, "workspace_ready"), Some("no"));
     assert_eq!(detail_value(&payload, "codex_cli"), Some("missing"));
     assert_eq!(detail_value(&payload, "codex_connection"), Some("missing"));
+    assert_eq!(
+        detail_value(&payload, "supported_llm_backends"),
+        Some("codex_cli")
+    );
     assert!(warning_contains(&payload, "No HeeForge workspace marker"));
     assert!(warning_contains(&payload, "Codex CLI was not found"));
     assert!(payload["next_steps"]
@@ -176,6 +189,50 @@ fn doctor_json_reports_setup_issues_without_workspace() -> Result<()> {
         .unwrap_or(&vec![])
         .iter()
         .any(|item| item.as_str().unwrap_or_default().contains("codex login")));
+
+    Ok(())
+}
+
+#[test]
+fn status_json_error_for_unsupported_llm_backend_is_structured() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("unsupported-backend-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+
+    std::fs::write(
+        global_dir.join("config.toml"),
+        "version = 1\nllm_backend = \"gemini_cli\"\ncodex_command = \"codex\"\nallow_dummy_fallback = false\nlog_prompts = false\nworkspace_auto_commit = false\ndefault_language = \"ko\"\n",
+    )?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("status")
+        .env("HEEFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8(output.stderr)?;
+    let payload: Value = serde_json::from_str(&stderr)?;
+    assert_eq!(payload["status"], "error");
+    assert_eq!(payload["error_code"], "unsupported_llm_backend");
+    assert!(payload["reason"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("unsupported llm backend"));
+    assert!(payload["remediation"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .any(|item| item
+            .as_str()
+            .unwrap_or_default()
+            .contains("llm_backend = \"codex_cli\"")));
 
     Ok(())
 }

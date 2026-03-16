@@ -268,6 +268,27 @@ impl ErrorOutput {
             };
         }
 
+        if reason.contains("unsupported llm backend") {
+            return Self {
+                schema_version: OUTPUT_SCHEMA_VERSION,
+                status: "error",
+                agent_mode: false,
+                command: command.to_string(),
+                workspace: workspace_display,
+                error_code: "unsupported_llm_backend".to_string(),
+                reason,
+                remediation: vec![
+                    "Open ~/.config/heeforge/config.toml and set llm_backend = \"codex_cli\"."
+                        .to_string(),
+                    "If you intended to use a custom backend, install a HeeForge build that includes that backend first."
+                        .to_string(),
+                    example_for("doctor", workspace),
+                ],
+                example_command: Some(example_for("doctor", workspace)),
+                details: vec![],
+            };
+        }
+
         if looks_like_codex_error(&reason) {
             let mut remediation = vec!["Open a terminal and run: codex login".to_string()];
             if looks_like_network_error(&reason) {

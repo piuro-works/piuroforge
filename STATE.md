@@ -7,6 +7,7 @@
 - `heeforge` Rust 크레이트가 생성되어 있다.
 - CLI command 집합이 `src/main.rs`와 `src/commands/`에 구현되어 있다.
 - `doctor` 명령이 workspace 상태, 필수 novel 설정, Codex 연결, fallback 설정을 진단한다.
+- 전역 설정 `llm_backend`와 `doctor`/`capabilities` 출력이 현재 선택 backend와 지원 backend 목록을 노출한다.
 - `NovelEngine`는 이제 workspace/state/file 제어를 맡고, Codex 기반 scene/review/rewrite/world generation은 주입 가능한 `NovelBackend` 경계 뒤로 분리됐다.
 - LLM 호출 경계도 `PromptRunner` 추상화로 분리되어, Codex 외 CLI runner를 추가해도 planner/writer/editor/critic orchestration을 재사용할 수 있다.
 - `novel.toml`은 작가용 주석과 함께 `chapter_scene_target` 기본값을 노출하며, 기본 drafting 구조를 `incident -> escalation -> cliffhanger`로 안내한다.
@@ -111,6 +112,6 @@
 
 ## Recommended Next Actions
 
-1. planner/writer/editor/critic에 대한 fixture 기반 테스트를 추가한다.
-2. `doctor` 명령에 더 자세한 플랫폼별 네트워크 점검 가이드를 추가한다.
+1. planner/critic 출력 schema validation을 강화한다.
+2. `doctor` 명령에 backend별 설치/로그인 가이드를 확장한다.
 3. GitHub Release 원격 자산을 대상으로 `install.sh` end-to-end smoke check를 한 번 더 수행한다.

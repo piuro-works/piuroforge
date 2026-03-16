@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::path::{Path, PathBuf};
 
+pub const DEFAULT_LLM_BACKEND: &str = "codex_cli";
+pub const SUPPORTED_LLM_BACKENDS: &[&str] = &[DEFAULT_LLM_BACKEND];
+
 pub const WORKSPACE_DIR_NAME: &str = ".novel";
 pub const WORKSPACE_MANIFEST_FILE: &str = "workspace.json";
 pub const WORKSPACE_CONFIG_FILE: &str = "novel.toml";
@@ -30,6 +33,7 @@ pub struct Config {
     pub allow_dummy_fallback: bool,
     pub log_prompts: bool,
     pub workspace_auto_commit: bool,
+    pub llm_backend: String,
     pub codex_command: String,
     pub codex_timeout_secs: u64,
 }
@@ -64,6 +68,10 @@ impl Config {
         if novel_settings.title.trim().is_empty() {
             novel_settings.title = default_title_from_path(&workspace_dir);
         }
+        let llm_backend = env::var("HEEFORGE_LLM_BACKEND")
+            .or_else(|_| env::var("NOVEL_ENGINE_LLM_BACKEND"))
+            .unwrap_or_else(|_| global_settings.llm_backend.clone());
+        let llm_backend = normalize_llm_backend(&llm_backend)?;
 
         Ok(Self {
             workspace_dir,
@@ -89,6 +97,7 @@ impl Config {
             workspace_auto_commit: env_flag("HEEFORGE_WORKSPACE_AUTO_COMMIT")
                 .or_else(|| env_flag("NOVEL_ENGINE_WORKSPACE_AUTO_COMMIT"))
                 .unwrap_or(global_settings.workspace_auto_commit),
+            llm_backend,
             codex_command: env::var("HEEFORGE_CODEX_CMD")
                 .or_else(|_| env::var("NOVEL_ENGINE_CODEX_CMD"))
                 .unwrap_or_else(|_| global_settings.codex_command.clone()),
@@ -119,15 +128,17 @@ impl Config {
 #\n\
 # First run for writers:\n\
 # 1. Open a terminal once and run: codex login\n\
-# 2. Leave allow_dummy_fallback = false for real drafting\n\
-# 3. Turn allow_dummy_fallback = true on only if you intentionally want placeholder text for workflow testing\n\
-# 4. Turn workspace_auto_commit = true on if you want Git history created automatically inside each novel workspace\n\
+# 2. Keep llm_backend = \"codex_cli\" unless you intentionally install a custom HeeForge backend build later\n\
+# 3. Leave allow_dummy_fallback = false for real drafting\n\
+# 4. Turn allow_dummy_fallback = true on only if you intentionally want placeholder text for workflow testing\n\
+# 5. Turn workspace_auto_commit = true on if you want Git history created automatically inside each novel workspace\n\
 #\n\
 # If HeeForge shows `codex_unavailable`, the usual causes are:\n\
 # - codex login has not been completed yet\n\
 # - this machine cannot reach the Codex service because of internet, DNS, VPN, or proxy issues\n\
 \n\
 version = {version}\n\
+llm_backend = {llm_backend:?}\n\
 codex_command = {codex_command:?}\n\
 codex_timeout_secs = {codex_timeout_secs}\n\
 allow_dummy_fallback = {allow_dummy_fallback}\n\
@@ -136,6 +147,7 @@ workspace_auto_commit = {workspace_auto_commit}\n\
 default_language = {default_language:?}\n\
 {default_workspace_root}",
             version = self.global_settings.version,
+            llm_backend = self.global_settings.llm_backend,
             codex_command = self.global_settings.codex_command,
             codex_timeout_secs = self.global_settings.codex_timeout_secs,
             allow_dummy_fallback = self.global_settings.allow_dummy_fallback,
@@ -182,6 +194,8 @@ default_language = {default_language:?}\n\
 pub struct GlobalSettings {
     #[serde(default = "default_config_version")]
     pub version: u32,
+    #[serde(default = "default_llm_backend")]
+    pub llm_backend: String,
     #[serde(default = "default_codex_command")]
     pub codex_command: String,
     #[serde(default = "default_codex_timeout_secs")]
@@ -202,6 +216,7 @@ impl Default for GlobalSettings {
     fn default() -> Self {
         Self {
             version: default_config_version(),
+            llm_backend: default_llm_backend(),
             codex_command: default_codex_command(),
             codex_timeout_secs: default_codex_timeout_secs(),
             allow_dummy_fallback: default_allow_dummy_fallback(),
@@ -360,6 +375,10 @@ fn default_codex_command() -> String {
     "codex".to_string()
 }
 
+fn default_llm_backend() -> String {
+    DEFAULT_LLM_BACKEND.to_string()
+}
+
 fn default_codex_timeout_secs() -> u64 {
     120
 }
@@ -395,4 +414,24 @@ fn default_genre() -> String {
 
 fn default_tone() -> String {
     "Focused, cinematic, character-driven".to_string()
+}
+
+fn normalize_llm_backend(value: &str) -> Result<String> {
+    let normalized = value.trim().to_ascii_lowercase();
+    if normalized.is_empty() {
+        anyhow::bail!(
+            "unsupported llm backend ``. supported backends: {}",
+            SUPPORTED_LLM_BACKENDS.join(", ")
+        );
+    }
+
+    if SUPPORTED_LLM_BACKENDS.contains(&normalized.as_str()) {
+        Ok(normalized)
+    } else {
+        anyhow::bail!(
+            "unsupported llm backend `{}`. supported backends: {}",
+            value.trim(),
+            SUPPORTED_LLM_BACKENDS.join(", ")
+        );
+    }
 }

@@ -316,6 +316,7 @@ OpenClaw 같은 에이전트에는 다음 규칙을 권장한다.
 중요한 점:
 
 - 현재 auth mode는 `codex_cli`다.
+- 현재 기본 `llm_backend`는 `codex_cli`다.
 - 에이전트도 직접 OAuth를 추측하지 말고 `codex login` 전제를 따라야 한다.
 - `schema_version`과 `agent_mode`를 먼저 확인하고 파싱하는 쪽이 안전하다.
 
@@ -346,6 +347,7 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 `.env.example` 참고.
 
 - `HEEFORGE_CODEX_CMD`: 기본값 `codex`
+- `HEEFORGE_LLM_BACKEND`: 기본값 `codex_cli`
 - `HEEFORGE_CODEX_TIMEOUT_SECS`: 기본값 `120`
 - `HEEFORGE_ALLOW_DUMMY`: 기본값 `false`
 - `HEEFORGE_LOG_PROMPTS`: 기본값 `false`, `true`면 prompt/response 로그를 `.novel/logs/llm_prompts/`에 저장
@@ -371,6 +373,7 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 - core/story/active memory markdown 관리
 - scene markdown 저장 및 조회
 - planner/writer/editor/critic 프롬프트 템플릿 분리
+- `llm_backend` 전역 설정과 `doctor`/`capabilities`의 backend 진단 노출
 - scene 생성 로그 저장
 - rewrite 원본/수정본 snapshot 보존
 - review 결과 JSON 저장
@@ -384,5 +387,5 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 - planner 출력 schema 검증 강화
 - chapter/arc 단위 요약 memory 자동화
 - 승인 이력 및 diff 로그
-- agent별 prompt 템플릿 분리
-- trait 기반 mock runner 주입
+- backend registry와 backend별 doctor/install 가이드 확장
+- release/install 원격 end-to-end smoke check 자동화

@@ -35,15 +35,23 @@ pub struct NovelEngine {
 
 impl NovelEngine {
     pub fn new(config: Config) -> Result<Self> {
-        let mut codex_runner = CodexRunner::new(
-            config.codex_command.clone(),
-            Duration::from_secs(config.codex_timeout_secs),
-        );
-        if config.log_prompts {
-            codex_runner = codex_runner.with_prompt_logging(config.logs_dir.join("llm_prompts"));
-        }
+        match config.llm_backend.as_str() {
+            "codex_cli" => {
+                let mut codex_runner = CodexRunner::new(
+                    config.codex_command.clone(),
+                    Duration::from_secs(config.codex_timeout_secs),
+                );
+                if config.log_prompts {
+                    codex_runner =
+                        codex_runner.with_prompt_logging(config.logs_dir.join("llm_prompts"));
+                }
 
-        Self::with_backend(config, Arc::new(CodexNovelBackend::new(codex_runner)))
+                Self::with_backend(config, Arc::new(CodexNovelBackend::new(codex_runner)))
+            }
+            backend => Err(anyhow!(
+                "unsupported llm backend `{backend}`. supported backends: codex_cli"
+            )),
+        }
     }
 
     pub fn with_backend(
