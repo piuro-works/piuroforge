@@ -1,6 +1,6 @@
-# HeeForge MVP
+# HeeForge
 
-Rust 기반 CLI-first AI 소설 생성 엔진 MVP다. 웹 UI 없이 `heeforge` 명령만으로 scene 생성, 리뷰, 수정, 승인, 상태 확인을 수행한다.
+Rust 기반 CLI-first AI 소설 작성 프레임워크다. 웹 UI 없이 `heeforge` 명령만으로 scene 생성, 리뷰, 수정, 승인, 상태 확인을 수행한다.
 
 LLM 호출은 직접 OpenAI API 키/OAuth를 다루지 않고, 사용자가 미리 로그인한 `codex` CLI subprocess만 사용한다. `codex`가 실패한 경우 기본 동작은 즉시 에러를 반환하는 것이고, dummy fallback은 명시적으로 opt-in 했을 때만 허용한다.
 
@@ -275,6 +275,7 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 - chapter markdown: `<workspace>/02_Draft/Chapters/chapter_<chapter>-<slug>.md` (slug는 compiled chapter `short_title` 기준, 만들 수 없으면 `chapter_<chapter>.md`)
 - review 결과 JSON: `<workspace>/06_Review/Feedback/<scene_id>.json`
 - rewrite 원본/수정본과 revision record: `<workspace>/06_Review/Revisions/<scene_id>/`
+  - revision record에는 `source_review_score`, `post_rewrite_review_score`가 함께 저장된다.
 - scene 생성 로그: `<workspace>/.novel/logs/scene_generation/<scene_id>.json`
 - opt-in prompt 로그: `<workspace>/.novel/logs/llm_prompts/*.json` (`HEEFORGE_LOG_PROMPTS=true` 또는 전역 `log_prompts = true`일 때만)
 - chapter 생성 시 scene 번호가 1부터 연속인지 검증한다.
@@ -297,7 +298,7 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 `HEEFORGE_CODEX_TIMEOUT_SECS`로 실제 codex 응답 대기 시간을 조절할 수 있다.
 환경 변수 우선순위는 전역 설정 파일보다 높다.
 
-## 현재 MVP 범위
+## 현재 제공 범위
 
 - 별도 워크스페이스 생성 및 `.novel/` 저장소 관리
 - 전역 `config.toml`, 소설별 `novel.toml`, 내부 `workspace.json` 분리
@@ -317,7 +318,7 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 - `codex` subprocess timeout 및 hang 방지 강제 종료
 - 최소 smoke test 및 runner retry test
 
-## 다음 확장 포인트
+## 다음 고도화 포인트
 
 - planner 출력 schema 검증 강화
 - chapter/arc 단위 요약 memory 자동화

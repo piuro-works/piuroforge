@@ -2,7 +2,7 @@
 
 ## Purpose
 
-이 프로젝트는 Rust 기반 CLI-first AI 소설 엔진 MVP다. CLI 실행 이름은 `heeforge`이며, 모든 변경은 웹 UI가 아니라 CLI 워크플로를 우선해야 한다.
+이 프로젝트는 Rust 기반 CLI-first AI 소설 작성 프레임워크다. CLI 실행 이름은 `heeforge`이며, 모든 변경은 웹 UI가 아니라 CLI 워크플로를 우선해야 한다.
 
 ## Hard Constraints
 
@@ -23,12 +23,13 @@
 - 전역 런타임 설정은 `~/.config/heeforge/config.toml`에 둔다.
 - 소설별 설정은 워크스페이스 루트의 `novel.toml`에 둔다.
 - `.novel/workspace.json`은 엔진 내부 메타만 담는다.
-- 실제 작업 데이터는 워크스페이스 루트 아래 `.novel/`에 저장한다.
+- 사람용 작업 데이터는 워크스페이스 루트의 numbered folder 구조에 저장한다.
+- scene/chapter 산출물은 `02_Draft/` 아래 markdown 파일로 유지한다.
 - 상태는 `.novel/state/project_state.json`으로 관리한다.
 - 메모리는 `.novel/memory/*.md`로 관리한다.
-- scene/chapter 산출물은 `.novel/` 아래 markdown 파일로 유지한다.
 - 테스트 가능성을 위해 dummy fallback 경로를 유지한다.
 - `CodexRunner`는 subprocess 경계다. 다른 모듈에서 직접 `codex`를 호출하지 않는다.
+- `NovelEngine`는 workspace/state/file 제어에 집중하고, Codex generation은 backend 경계 뒤에 둔다.
 
 ## Change Checklist
 

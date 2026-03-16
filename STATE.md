@@ -26,11 +26,13 @@
 - 저장소 루트 `install.sh`가 GitHub Release 자산 설치를 지원한다.
 - `scripts/package-release.sh`가 target별 `heeforge-<target>.tar.gz`와 `.sha256`를 생성한다.
 - `.github/workflows/release.yml`가 `v*` tag push 시 release 자산 발행을 담당한다.
+- `v1.0.0` release가 GitHub Releases에 실제 발행됐고, 4개 target 자산과 `.sha256` 파일이 게시됐다.
 - `next-scene`은 `premise`, `protagonist_name` 등 필수 `novel.toml` 값이 비어 있으면 실패한다.
 - planner/writer/expand-world 프롬프트는 full memory 파일 대신 bounded prompt memory view를 사용해 `story_memory`와 `open_conflicts` 누적을 완화한다.
 - dummy fallback은 기본 비활성화로 전환됐고, opt-in일 때만 허용된다.
 - opt-in prompt logging이 추가되어, 켜면 `.novel/logs/llm_prompts/`에 agent label별 prompt/response JSON 로그를 남긴다.
 - opt-in workspace Git auto-commit이 추가되어, 켜면 workspace repo를 자동 초기화하고 변경 명령 뒤에 자동 commit을 남긴다.
+- rewrite metadata는 이제 `source_review_score`와 `post_rewrite_review_score`를 저장해 revision과 review 점수를 연결한다.
 - `next-scene`, `review`, `rewrite`, `expand-world`는 dummy fallback이 발생하면 성공 응답에도 warning을 노출한다.
 - codex 실패 에러 출력은 로그인 문제와 네트워크/transport 문제를 구분해 remediation을 안내하고, opt-in dummy fallback 설정 경로도 보여준다.
 - `init` 출력과 workspace root `README.md`는 `codex login`, dummy fallback, workspace auto-commit 설정 순서를 비개발자 기준으로 안내한다.
@@ -84,12 +86,13 @@
 - 바이너리 테스트에서 `review`의 `no_current_scene`, `next-chapter`의 `empty_chapter`/`invalid_scene_sequence`, `show`의 missing scene generic error payload가 검증됐다.
 - 바이너리 테스트와 smoke test가 chapter scene target 초과 생성 차단과 incomplete chapter compile 차단을 검증한다.
 - 로컬 release asset을 만든 뒤 `HEEFORGE_DOWNLOAD_URL=file://... ./install.sh` 설치 smoke check가 통과했다.
+- `v1.0.0` tag push 후 GitHub Actions release workflow가 성공적으로 release 자산을 게시했다.
 - hang 재현 테스트에서 `codex exec` timeout과 no-retry 동작이 검증됐다.
 - 요구된 문서 파일인 `README.md`, `.env.example`, `AGENTS.md`, `SPEC.md`, `STATE.md`가 존재한다.
 
 ## Not Yet Verified
 
-- GitHub Release 원격 URL에서 실제 `install.sh` end-to-end 설치는 tag release 발행 후 추가 검증이 필요하다.
+- GitHub Release 원격 URL에서 실제 `install.sh` end-to-end 설치는 아직 별도 smoke check를 다시 돌리지 않았다.
 
 ## Known Gaps / Risks
 
@@ -98,11 +101,10 @@
 - chapter 승인 정책과 open conflict 해소 정책은 아직 단순하다.
 - 실제 codex 응답 형식이 JSON 규약을 어기면 fallback 동작에 의존하게 된다.
 - JSON 출력 계약은 현재 안정화됐지만 아직 command별 세부 schema versioning은 없다.
-- GitHub Actions runner 가용성에 따라 `ubuntu-24.04-arm` release job은 저장소 환경에서 추가 검증이 필요할 수 있다.
 - 실제 codex 응답 시간이 긴 작업에서는 기본 120초 timeout이 짧을 수 있어 운영 환경에 맞춘 조정이 필요할 수 있다.
 
 ## Recommended Next Actions
 
 1. planner/writer/editor/critic에 대한 fixture 기반 테스트를 추가한다.
 2. `doctor` 명령에 더 자세한 플랫폼별 네트워크 점검 가이드를 추가한다.
-3. tag release 한 번을 실제로 발행해 `install.sh`가 원격 Release 경로에서도 정상 동작하는지 검증한다.
+3. GitHub Release 원격 자산을 대상으로 `install.sh` end-to-end smoke check를 한 번 더 수행한다.

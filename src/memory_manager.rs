@@ -59,7 +59,7 @@ impl MemoryManager {
         if !self.core_path.exists() {
             write_string(
                 &self.core_path,
-                "# Core Memory\n\n- Genre: TBD\n- Tone: Focused, cinematic, character-driven\n- Long-term promise: A coherent serialized novel MVP\n",
+                "# Core Memory\n\n- Genre: TBD\n- Tone: Focused, cinematic, character-driven\n- Long-term promise: A coherent serialized novel\n",
             )?;
         }
 
