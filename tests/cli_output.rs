@@ -143,8 +143,15 @@ fn init_json_creates_ready_workspace_without_prompting() -> Result<()> {
     assert_eq!(detail_value(&payload, "title"), Some("Fresh Novel"));
     assert_eq!(
         detail_value(&payload, "writer_setup"),
-        Some("Run `codex login` once before your first real scene. Leave dummy fallback off unless you intentionally want placeholder text.")
+        Some("Run `codex login` once, then run `heeforge doctor`.")
     );
+    assert_eq!(
+        detail_value(&payload, "setup_done_when"),
+        Some("If `heeforge doctor` says ready, HeeForge setup is finished and you can draft.")
+    );
+    assert!(detail_value(&payload, "hosted_agent_note")
+        .unwrap_or_default()
+        .contains("approval prompts"));
     assert!(payload["next_steps"]
         .as_array()
         .unwrap_or(&vec![])

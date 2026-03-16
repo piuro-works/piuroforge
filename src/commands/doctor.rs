@@ -285,7 +285,7 @@ fn render_doctor_body(
     };
 
     format!(
-        "HeeForge Doctor\n\n- Workspace: {workspace_state}\n- Novel config: {config_state}\n- Codex: {codex_state}\n- Fallback: {fallback_state}\n- Workspace Git auto-commit: {git_state}"
+        "HeeForge Doctor\n\n- Workspace: {workspace_state}\n- Novel config: {config_state}\n- Codex: {codex_state}\n- Fallback: {fallback_state}\n- Workspace Git auto-commit: {git_state}\n\nIf Doctor says ready, HeeForge setup is finished and you can move on to `heeforge next-scene`.\n\nIf you run HeeForge through another assistant, IDE agent, or sandboxed tool, that host may still ask for its own approval prompts. Those prompts are outside HeeForge."
     )
 }
 

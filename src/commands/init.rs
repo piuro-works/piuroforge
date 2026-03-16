@@ -101,8 +101,8 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
             engine.workspace_dir(),
             "Novel workspace initialized and ready for scene generation.",
         )
-        .next_step(super::workspace_command(engine, "doctor"))
         .next_step("codex login")
+        .next_step(super::workspace_command(engine, "doctor"))
         .next_step(format!("Open {}", engine.global_config_path().display()))
         .next_step(super::workspace_command(engine, "next-scene"));
         if engine.workspace_auto_commit_enabled() {
@@ -137,7 +137,15 @@ pub fn run(engine: &NovelEngine) -> Result<CommandOutput> {
         )
         .detail(
             "writer_setup",
-            "Run `codex login` once before your first real scene. Leave dummy fallback off unless you intentionally want placeholder text.",
+            "Run `codex login` once, then run `heeforge doctor`.",
+        )
+        .detail(
+            "setup_done_when",
+            "If `heeforge doctor` says ready, HeeForge setup is finished and you can draft.",
+        )
+        .detail(
+            "hosted_agent_note",
+            "If you run HeeForge through another assistant or sandboxed tool, that host may still ask for its own approval prompts. Those prompts do not come from HeeForge itself.",
         )
         .detail(
             "workspace_config",
