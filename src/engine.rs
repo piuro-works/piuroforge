@@ -12,6 +12,7 @@ use crate::models::{
     derive_short_title, slug_fragment, MemoryBundle, OperationResult, ReviewIssue, ReviewOutcome,
     ReviewReport, RewriteRecord, Scene, SceneGenerationLog, StoryState, WorkspaceManifest,
 };
+use crate::launch_contract::validate_launch_contract;
 use crate::novel_backend::{
     CodexNovelBackend, NovelBackend, ReviewRequest, RewriteRequest, SceneGenerationRequest,
     WorldExpansionRequest,
@@ -100,6 +101,7 @@ impl NovelEngine {
 
     pub fn generate_next_scene(&self) -> Result<OperationResult<Scene>> {
         self.init_project()?;
+        self.ensure_launch_contract_ready()?;
         let mut state = self.prepare_generation_state()?;
         let memory = self.memory_manager.load_prompt_bundle()?;
         let foundation = self.load_story_foundation_bundle()?;
@@ -148,6 +150,15 @@ impl NovelEngine {
             value: final_scene,
             warnings,
         })
+    }
+
+    fn ensure_launch_contract_ready(&self) -> Result<()> {
+        let report = validate_launch_contract(&self.config.workspace_dir, &self.config.novel_settings)?;
+        if report.has_blocking_issues() {
+            let reasons = report.blocking_messages().join(" | ");
+            anyhow::bail!("launch contract validation failed: {reasons}");
+        }
+        Ok(())
     }
 
     pub fn review_current_scene(&self) -> Result<OperationResult<ReviewOutcome>> {

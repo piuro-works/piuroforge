@@ -197,6 +197,59 @@ fn doctor_json_reports_setup_issues_without_workspace() -> Result<()> {
 }
 
 #[test]
+fn doctor_json_reports_launch_contract_conflicts() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("doctor-launch-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let mut config = Config::with_global_config_dir(workspace.clone(), global_dir.clone())?;
+    config.novel_settings.genre = "Fantasy".to_string();
+    config.novel_settings.tone = "Fast, dangerous, serialized".to_string();
+    config.novel_settings.premise = "An exile tries to flee a collapsing occupation city.".to_string();
+    config.novel_settings.protagonist_name = "Ulan".to_string();
+    config.novel_settings.serialized_workflow = true;
+    config.novel_settings.launch_contract.must_show_by_scene_3 = vec![
+        "larzesh".to_string(),
+        "golem_hint".to_string(),
+    ];
+    config.allow_dummy_fallback = true;
+    config.global_settings.allow_dummy_fallback = true;
+    config.codex_command = "codex-command-for-tests-that-does-not-exist".to_string();
+    config.global_settings.codex_command =
+        "codex-command-for-tests-that-does-not-exist".to_string();
+    let engine = NovelEngine::new(config)?;
+    engine.init_project()?;
+    std::fs::write(
+        workspace.join("03_StoryBible/Plot/PLOT-000-Launch.md"),
+        "# Launch\n\n## Episode Spine\n1. 배급소 붕괴와 통행패 압수\n2. 배수 골목 추락과 첫 추격 회피\n3. 떠나기 위한 최소 짐과 유적 단서 확보\n4. 검문 강화 속 비공식 탈출로로 도시 이탈\n7. 사슬에 묶인 라르제쉬 조우\n",
+    )?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("doctor")
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
+        .env(
+            "PIUROFORGE_CODEX_CMD",
+            "codex-command-for-tests-that-does-not-exist",
+        )
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(detail_value(&payload, "launch_contract_status"), Some("blocking_issues"));
+    assert_eq!(detail_value(&payload, "launch_contract_enabled"), Some("true"));
+    assert!(warning_contains(&payload, "launch_contract requires `larzesh` by scene 3"));
+    assert!(warning_contains(&payload, "launch_contract requires `golem_hint` by scene 3"));
+
+    Ok(())
+}
+
+#[test]
 fn status_json_error_for_unsupported_llm_backend_is_structured() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("unsupported-backend-novel");
@@ -655,6 +708,64 @@ fn next_scene_json_error_contains_remediation() -> Result<()> {
 }
 
 #[test]
+fn next_scene_json_error_when_launch_contract_conflicts() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("launch-guard-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let mut config = Config::with_global_config_dir(workspace.clone(), global_dir.clone())?;
+    config.novel_settings.genre = "Fantasy".to_string();
+    config.novel_settings.tone = "Fast, dangerous, serialized".to_string();
+    config.novel_settings.premise = "An exile tries to flee a collapsing occupation city.".to_string();
+    config.novel_settings.protagonist_name = "Ulan".to_string();
+    config.novel_settings.serialized_workflow = true;
+    config.novel_settings.launch_contract.must_show_by_scene_3 = vec![
+        "larzesh".to_string(),
+        "golem_hint".to_string(),
+    ];
+    config.codex_command = "codex-command-for-tests-that-does-not-exist".to_string();
+    config.global_settings.codex_command =
+        "codex-command-for-tests-that-does-not-exist".to_string();
+    let engine = NovelEngine::new(config)?;
+    engine.init_project()?;
+    std::fs::write(
+        workspace.join("03_StoryBible/Plot/PLOT-000-Launch.md"),
+        "# Launch\n\n## Episode Spine\n1. 배급소 붕괴와 통행패 압수\n2. 배수 골목 추락과 첫 추격 회피\n3. 떠나기 위한 최소 짐과 유적 단서 확보\n4. 검문 강화 속 비공식 탈출로로 도시 이탈\n7. 사슬에 묶인 라르제쉬 조우\n",
+    )?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("next-scene")
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
+        .output()?;
+
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8(output.stderr)?;
+    let payload: Value = serde_json::from_str(&stderr)?;
+    assert_eq!(payload["status"], "error");
+    assert_eq!(payload["error_code"], "launch_contract_conflict");
+    assert!(payload["reason"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("launch contract validation failed"));
+    assert!(payload["remediation"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .any(|item| item.as_str().unwrap_or_default().contains("novel.toml")));
+    assert!(payload["remediation"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .any(|item| item.as_str().unwrap_or_default().contains("03_StoryBible/Plot")));
+
+    Ok(())
+}
+
+#[test]
 fn show_json_output_is_structured() -> Result<()> {
     let temp_dir = tempdir()?;
     let workspace = temp_dir.path().join("demo-novel");
@@ -888,6 +999,86 @@ fn rewrite_json_output_preserves_history_and_updates_scene() -> Result<()> {
     let rewrite_record = std::fs::read_to_string(history_dir.join("rewrite_001.json"))?;
     assert!(rewrite_record.contains("\"source_review_score\": null"));
     assert!(rewrite_record.contains("\"post_rewrite_review_score\": null"));
+
+    Ok(())
+}
+
+#[test]
+fn polish_json_output_uses_current_scene_when_scene_id_is_omitted() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+    engine.generate_next_scene()?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("polish")
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
+        .env(
+            "PIUROFORGE_CODEX_CMD",
+            "codex-command-for-tests-that-does-not-exist",
+        )
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["command"], "polish");
+    assert_eq!(detail_value(&payload, "scene_id"), Some("scene_001_001"));
+    assert_eq!(detail_value(&payload, "pass"), Some("line_edit"));
+    assert!(warning_contains(&payload, "editor used dummy fallback"));
+    assert!(payload["next_steps"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .any(|item| item.as_str().unwrap_or_default().contains("proofread scene_001_001")));
+
+    Ok(())
+}
+
+#[test]
+fn proofread_json_output_uses_current_scene_when_scene_id_is_omitted() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let engine = ready_engine(workspace.clone(), global_dir.clone())?;
+    engine.init_project()?;
+    engine.generate_next_scene()?;
+
+    let output = Command::new(novel_bin())
+        .arg("--workspace")
+        .arg(&workspace)
+        .arg("--format")
+        .arg("json")
+        .arg("proofread")
+        .env("PIUROFORGE_CONFIG_DIR", &global_dir)
+        .env(
+            "PIUROFORGE_CODEX_CMD",
+            "codex-command-for-tests-that-does-not-exist",
+        )
+        .output()?;
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let payload: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["command"], "proofread");
+    assert_eq!(detail_value(&payload, "scene_id"), Some("scene_001_001"));
+    assert_eq!(detail_value(&payload, "pass"), Some("proofread"));
+    assert!(warning_contains(&payload, "editor used dummy fallback"));
+    assert!(payload["next_steps"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .any(|item| item.as_str().unwrap_or_default().contains("approve scene_001_001")));
 
     Ok(())
 }

@@ -64,6 +64,20 @@ Examples:
   piuroforge --workspace ~/novels/my-book --format json rewrite scene_001_001 --instruction \"Compress repeated exposition\"
 ";
 
+const POLISH_AFTER_HELP: &str = "\
+Examples:
+  piuroforge polish
+  piuroforge polish scene_001_001
+  piuroforge --workspace ~/novels/my-book --format json polish scene_001_001
+";
+
+const PROOFREAD_AFTER_HELP: &str = "\
+Examples:
+  piuroforge proofread
+  piuroforge proofread scene_001_001
+  piuroforge --workspace ~/novels/my-book --format json proofread scene_001_001
+";
+
 const APPROVE_AFTER_HELP: &str = "\
 Examples:
   piuroforge approve scene_001_001
@@ -171,6 +185,16 @@ enum NovelCommand {
         instruction: String,
     },
     #[command(
+        about = "Run a line-edit pass focused on sentence flow, rhythm, and local readability.",
+        after_long_help = POLISH_AFTER_HELP
+    )]
+    Polish { scene_id: Option<String> },
+    #[command(
+        about = "Run a proofread pass focused on spelling, spacing, punctuation, and term consistency.",
+        after_long_help = PROOFREAD_AFTER_HELP
+    )]
+    Proofread { scene_id: Option<String> },
+    #[command(
         about = "Mark a scene as approved.",
         after_long_help = APPROVE_AFTER_HELP
     )]
@@ -207,6 +231,8 @@ impl NovelCommand {
             Self::NextScene => "next-scene",
             Self::Review => "review",
             Self::Rewrite { .. } => "rewrite",
+            Self::Polish { .. } => "polish",
+            Self::Proofread { .. } => "proofread",
             Self::Approve { .. } => "approve",
             Self::NextBundle => "next-bundle",
             Self::ExpandWorld => "expand-world",
@@ -281,6 +307,14 @@ fn run(cli: Cli) -> Result<CommandOutput> {
         } => {
             let engine = NovelEngine::new(Config::new(workspace)?)?;
             commands::rewrite::run(&engine, &scene_id, &instruction)
+        }
+        NovelCommand::Polish { scene_id } => {
+            let engine = NovelEngine::new(Config::new(workspace)?)?;
+            commands::polish::run(&engine, scene_id.as_deref())
+        }
+        NovelCommand::Proofread { scene_id } => {
+            let engine = NovelEngine::new(Config::new(workspace)?)?;
+            commands::proofread::run(&engine, scene_id.as_deref())
         }
         NovelCommand::Approve { scene_id } => {
             let engine = NovelEngine::new(Config::new(workspace)?)?;

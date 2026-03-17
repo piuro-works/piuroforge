@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use crate::codex_runner::CodexRunner;
 use crate::config::{Config, SUPPORTED_LLM_BACKENDS};
+use crate::launch_contract::validate_launch_contract;
 use crate::output::CommandOutput;
 
 pub fn run(config: &Config) -> Result<CommandOutput> {
@@ -27,6 +28,14 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
 
     let mut warnings = Vec::new();
     let mut next_steps = Vec::new();
+    let launch_contract_report = if workspace_config_exists {
+        Some(validate_launch_contract(
+            &config.workspace_dir,
+            &config.novel_settings,
+        )?)
+    } else {
+        None
+    };
 
     if !workspace_manifest_exists {
         warnings.push(
@@ -109,18 +118,38 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
         );
     }
 
+    let mut launch_contract_has_blocking_issues = false;
+    if let Some(report) = &launch_contract_report {
+        for issue in &report.issues {
+            warnings.push(issue.message.clone());
+            if issue.severity == crate::launch_contract::LaunchContractSeverity::Error {
+                launch_contract_has_blocking_issues = true;
+                next_steps.push(issue.remediation.clone());
+                next_steps.push(format!(
+                    "Edit {}",
+                    config.workspace_config_path.display()
+                ));
+            }
+        }
+    }
+
     let ready_to_draft = workspace_manifest_exists
         && workspace_config_exists
         && missing_fields.is_empty()
         && matches!(codex_connection, CodexConnection::Ready)
-        && !config.allow_dummy_fallback;
+        && !config.allow_dummy_fallback
+        && !launch_contract_has_blocking_issues;
 
     if ready_to_draft {
         next_steps.push(format!(
             "piuroforge --workspace {} next-scene",
             config.workspace_dir.display()
         ));
-    } else if workspace_manifest_exists && workspace_config_exists && missing_fields.is_empty() {
+    } else if workspace_manifest_exists
+        && workspace_config_exists
+        && missing_fields.is_empty()
+        && !matches!(codex_connection, CodexConnection::Ready)
+    {
         next_steps.push("Open a terminal and run: codex login".to_string());
     }
 
@@ -171,6 +200,19 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
         )
         .artifact("global_config", &config.global_config_path);
 
+    if let Some(report) = &launch_contract_report {
+        output = output
+            .detail("launch_contract_enabled", report.enabled.to_string())
+            .detail("launch_contract_status", report.status_label())
+            .detail(
+                "launch_contract_required_beats",
+                report.required_beats_summary(),
+            );
+        if let Some(path) = &report.primary_plot_path {
+            output = output.detail("launch_contract_primary_plot", path.display().to_string());
+        }
+    }
+
     if workspace_config_exists {
         output = output.artifact("workspace_config", &config.workspace_config_path);
     }
@@ -195,6 +237,10 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
         &codex_connection,
         config.allow_dummy_fallback,
         config.workspace_auto_commit,
+        launch_contract_report
+            .as_ref()
+            .map(|report| report.status_label())
+            .unwrap_or("not_checked"),
     ));
 
     Ok(output)
@@ -273,6 +319,7 @@ fn render_doctor_body(
     codex_connection: &CodexConnection,
     allow_dummy_fallback: bool,
     workspace_auto_commit: bool,
+    launch_contract_state: &str,
 ) -> String {
     let workspace_state = if workspace_manifest_exists && workspace_config_exists {
         "workspace files are present"
@@ -299,9 +346,17 @@ fn render_doctor_body(
     } else {
         "workspace auto-commit is OFF"
     };
+    let launch_state = match launch_contract_state {
+        "disabled" => "launch contract checks are OFF",
+        "empty" => "launch contract is enabled but empty",
+        "blocking_issues" => "launch contract has blocking conflicts",
+        "warnings" => "launch contract has warnings",
+        "ok" => "launch contract checks passed",
+        _ => "launch contract was not checked",
+    };
 
     format!(
-        "PiuroForge Doctor\n\n- LLM backend: {llm_backend}\n- Workspace: {workspace_state}\n- Novel config: {config_state}\n- Codex: {codex_state}\n- Fallback: {fallback_state}\n- Workspace Git auto-commit: {git_state}\n\nIf Doctor says ready, PiuroForge setup is finished and you can move on to `piuroforge next-scene`.\n\nIf you run PiuroForge through another assistant, IDE agent, or sandboxed tool, that host may still ask for its own approval prompts. Those prompts are outside PiuroForge."
+        "PiuroForge Doctor\n\n- LLM backend: {llm_backend}\n- Workspace: {workspace_state}\n- Novel config: {config_state}\n- Codex: {codex_state}\n- Fallback: {fallback_state}\n- Workspace Git auto-commit: {git_state}\n- Launch contract: {launch_state}\n\nIf Doctor says ready, PiuroForge setup is finished and you can move on to `piuroforge next-scene`.\n\nIf you run PiuroForge through another assistant, IDE agent, or sandboxed tool, that host may still ask for its own approval prompts. Those prompts are outside PiuroForge."
     )
 }
 

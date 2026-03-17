@@ -1,3 +1,5 @@
+use anyhow::{anyhow, Result};
+
 pub mod approve;
 pub mod capabilities;
 pub mod doctor;
@@ -6,6 +8,8 @@ pub mod init;
 pub mod memory;
 pub mod next_bundle;
 pub mod next_scene;
+pub mod polish;
+pub mod proofread;
 pub mod review;
 pub mod rewrite;
 pub mod show;
@@ -45,6 +49,21 @@ fn finalize_workspace_change(
             "Workspace auto-commit failed, but the command result was preserved: {reason}"
         )),
     }
+}
+
+fn resolve_target_scene_id(
+    engine: &NovelEngine,
+    scene_id: Option<&str>,
+    action: &str,
+) -> Result<String> {
+    if let Some(scene_id) = scene_id {
+        return Ok(scene_id.to_string());
+    }
+
+    engine
+        .get_status()?
+        .current_scene_id
+        .ok_or_else(|| anyhow!("no current scene available to {action}"))
 }
 
 fn sentence_list<T: AsRef<str>>(items: &[T]) -> String {

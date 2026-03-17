@@ -268,6 +268,56 @@ impl ErrorOutput {
             };
         }
 
+        if reason.contains("launch contract validation failed") {
+            let mut details = Vec::new();
+            if let Some(path) = workspace {
+                details.push(OutputField::new(
+                    "workspace_config",
+                    path.join("novel.toml").display().to_string(),
+                ));
+                details.push(OutputField::new(
+                    "plot_dir",
+                    path.join("03_StoryBible/Plot").display().to_string(),
+                ));
+            }
+            return Self {
+                schema_version: OUTPUT_SCHEMA_VERSION,
+                status: "error",
+                agent_mode: false,
+                command: command.to_string(),
+                workspace: workspace_display.clone(),
+                error_code: "launch_contract_conflict".to_string(),
+                reason,
+                remediation: vec![
+                    workspace
+                        .map(|path| {
+                            format!(
+                                "Edit {} and align launch_contract with the early launch promise.",
+                                path.join("novel.toml").display()
+                            )
+                        })
+                        .unwrap_or_else(|| {
+                            "Edit novel.toml and align launch_contract with the early launch promise."
+                                .to_string()
+                        }),
+                    workspace
+                        .map(|path| {
+                            format!(
+                                "Edit {} and move the required beats into the promised early scenes.",
+                                path.join("03_StoryBible/Plot").display()
+                            )
+                        })
+                        .unwrap_or_else(|| {
+                            "Edit 03_StoryBible/Plot and move the required beats into the promised early scenes."
+                                .to_string()
+                        }),
+                    example_for("doctor", workspace),
+                ],
+                example_command: Some(example_for("doctor", workspace)),
+                details,
+            };
+        }
+
         if reason.contains("unsupported llm backend") {
             return Self {
                 schema_version: OUTPUT_SCHEMA_VERSION,
@@ -352,7 +402,7 @@ impl ErrorOutput {
             };
         }
 
-        if reason.contains("no current scene available to review") {
+        if reason.contains("no current scene available") {
             return Self {
                 schema_version: OUTPUT_SCHEMA_VERSION,
                 status: "error",
@@ -362,7 +412,7 @@ impl ErrorOutput {
                 error_code: "no_current_scene".to_string(),
                 reason,
                 remediation: vec![
-                    "Generate a scene before running review.".to_string(),
+                    "Generate a scene before running this command, or pass an explicit scene id if the command supports it.".to_string(),
                     workspace
                         .map(|path| {
                             format!("Run: piuroforge --workspace {} next-scene", path.display())

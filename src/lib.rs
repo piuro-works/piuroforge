@@ -3,6 +3,7 @@ pub mod codex_runner;
 pub mod commands;
 pub mod config;
 pub mod engine;
+pub mod launch_contract;
 pub mod llm_runner;
 pub mod memory_manager;
 pub mod models;

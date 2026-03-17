@@ -168,6 +168,8 @@ default_language = {default_language:?}\n\
 # - scene is the primary drafting unit; serialized workflows often treat one scene as one upload episode\n\
 # - serialized_workflow = true keeps the day-to-day loop scene-first and rolls internal bundle boundaries automatically after approval\n\
 # - bundle_scene_target = 3 means each internal bundle should usually draft as incident -> escalation -> cliffhanger\n\
+# - launch_contract lets PiuroForge validate early-platform promises before drafting\n\
+# - known launch beats today: escape, larzesh, forced_companionship, relic_hint, golem_hint\n\
 # - Fill the story bible before serious drafting so planner and writer have real canon to follow\n\
 \n",
         );
@@ -191,6 +193,21 @@ default_language = {default_language:?}\n\
         rendered.push_str(&format!(
             "bundle_scene_target = {}\n",
             self.novel_settings.bundle_scene_target.max(1)
+        ));
+        rendered.push_str(
+            "\n[launch_contract]\n",
+        );
+        rendered.push_str(&format!(
+            "enabled = {}\n",
+            self.novel_settings.launch_contract.enabled
+        ));
+        rendered.push_str(&format!(
+            "must_show_by_scene_3 = {}\n",
+            render_string_array(&self.novel_settings.launch_contract.must_show_by_scene_3)
+        ));
+        rendered.push_str(&format!(
+            "must_show_by_scene_6 = {}\n",
+            render_string_array(&self.novel_settings.launch_contract.must_show_by_scene_6)
         ));
         Ok(rendered)
     }
@@ -256,6 +273,8 @@ pub struct NovelSettings {
     pub serialized_workflow: bool,
     #[serde(default = "default_bundle_scene_target")]
     pub bundle_scene_target: u32,
+    #[serde(default)]
+    pub launch_contract: LaunchContract,
 }
 
 impl Default for NovelSettings {
@@ -271,6 +290,7 @@ impl Default for NovelSettings {
             protagonist_name: String::new(),
             serialized_workflow: default_serialized_workflow(),
             bundle_scene_target: default_bundle_scene_target(),
+            launch_contract: LaunchContract::default(),
         }
     }
 }
@@ -302,12 +322,42 @@ impl NovelSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LaunchContract {
+    #[serde(default = "default_launch_contract_enabled")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub must_show_by_scene_3: Vec<String>,
+    #[serde(default)]
+    pub must_show_by_scene_6: Vec<String>,
+}
+
+impl Default for LaunchContract {
+    fn default() -> Self {
+        Self {
+            enabled: default_launch_contract_enabled(),
+            must_show_by_scene_3: Vec::new(),
+            must_show_by_scene_6: Vec::new(),
+        }
+    }
+}
+
+impl LaunchContract {
+    pub fn is_empty(&self) -> bool {
+        self.must_show_by_scene_3.is_empty() && self.must_show_by_scene_6.is_empty()
+    }
+}
+
 fn default_serialized_workflow() -> bool {
     false
 }
 
 fn default_bundle_scene_target() -> u32 {
     3
+}
+
+fn default_launch_contract_enabled() -> bool {
+    true
 }
 
 fn load_toml_or_default<T>(path: &Path) -> Result<T>
@@ -368,6 +418,15 @@ fn default_title_from_path(path: &Path) -> String {
         .map(title_case)
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+fn render_string_array(items: &[String]) -> String {
+    let rendered = items
+        .iter()
+        .map(|item| format!("{item:?}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("[{rendered}]")
 }
 
 fn title_case(segment: &str) -> String {

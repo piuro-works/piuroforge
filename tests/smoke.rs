@@ -41,6 +41,8 @@ fn init_project_creates_workspace_scaffold() -> Result<()> {
     assert!(workspace.join("06_Review/Revisions").exists());
     let workspace_config = std::fs::read_to_string(workspace.join("novel.toml"))?;
     assert!(workspace_config.contains("bundle_scene_target = 3"));
+    assert!(workspace_config.contains("[launch_contract]"));
+    assert!(workspace_config.contains("must_show_by_scene_3 = []"));
     assert!(workspace_config.contains("incident -> escalation -> cliffhanger"));
     assert!(workspace_config.contains("title = \"Demo Novel\""));
     let workspace_readme = std::fs::read_to_string(workspace.join("README.md"))?;
@@ -130,6 +132,44 @@ fn generate_next_scene_requires_initial_novel_metadata() -> Result<()> {
     assert!(error.to_string().contains("missing required novel config"));
     assert!(error.to_string().contains("premise"));
     assert!(error.to_string().contains("protagonist_name"));
+
+    Ok(())
+}
+
+#[test]
+fn generate_next_scene_rejects_launch_contract_conflict() -> Result<()> {
+    let temp_dir = tempdir()?;
+    let workspace = temp_dir.path().join("demo-novel");
+    let global_dir = temp_dir.path().join("config-home");
+    let mut config = Config::with_global_config_dir(workspace.clone(), global_dir)?;
+    config.novel_settings.genre = "Fantasy".to_string();
+    config.novel_settings.tone = "Fast, dangerous, serialized".to_string();
+    config.novel_settings.premise = "An exile tries to flee a collapsing occupation city.".to_string();
+    config.novel_settings.protagonist_name = "Ulan".to_string();
+    config.novel_settings.serialized_workflow = true;
+    config.novel_settings.launch_contract.must_show_by_scene_3 = vec![
+        "larzesh".to_string(),
+        "golem_hint".to_string(),
+    ];
+    config.allow_dummy_fallback = true;
+    config.global_settings.allow_dummy_fallback = true;
+    config.codex_command = "codex-command-for-tests-that-does-not-exist".to_string();
+    config.global_settings.codex_command =
+        "codex-command-for-tests-that-does-not-exist".to_string();
+    let engine = NovelEngine::new(config)?;
+
+    engine.init_project()?;
+    std::fs::write(
+        workspace.join("03_StoryBible/Plot/PLOT-000-Launch.md"),
+        "# Launch\n\n## Episode Spine\n1. 배급소 붕괴와 통행패 압수\n2. 배수 골목 추락과 첫 추격 회피\n3. 떠나기 위한 최소 짐과 유적 단서 확보\n4. 검문 강화 속 비공식 탈출로로 도시 이탈\n5. 길 위에서 인간 질서의 압박 재확인\n6. 협곡 길과 호송대 전조\n7. 사슬에 묶인 라르제쉬 조우\n",
+    )?;
+
+    let error = engine
+        .generate_next_scene()
+        .expect_err("expected launch contract conflict");
+    assert!(error.to_string().contains("launch contract validation failed"));
+    assert!(error.to_string().contains("larzesh"));
+    assert!(error.to_string().contains("golem_hint"));
 
     Ok(())
 }
