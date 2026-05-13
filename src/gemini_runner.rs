@@ -64,7 +64,9 @@ impl GeminiRunner {
     pub fn run_prompt_named(&self, label: &str, prompt: &str) -> Result<String> {
         let started_at = SystemTime::now();
         let started = std::time::Instant::now();
-        let args: [&str; 2] = ["-p", prompt];
+        // --skip-trust: gemini CLI는 headless 실행 시 workspace trust 승인을 요구한다.
+        // piuroforge는 prompt-only 호출이라 도구 권한이 필요 없으므로 매 실행마다 trust skip.
+        let args: [&str; 3] = ["--skip-trust", "-p", prompt];
         let result = run_with_timeout(&self.command, args, self.timeout);
 
         match result {
