@@ -1,15 +1,15 @@
 # STATE.md
 
-기준 시각: 2026-03-16
+기준 시각: 2026-05-12
 
 ## Current Status
 
 - `piuroforge` Rust 크레이트가 생성되어 있다.
 - CLI command 집합이 `src/main.rs`와 `src/commands/`에 구현되어 있다.
-- `doctor` 명령이 workspace 상태, 필수 novel 설정, Codex 연결, fallback 설정을 진단한다.
-- 전역 설정 `llm_backend`와 `doctor`/`capabilities` 출력이 현재 선택 backend와 지원 backend 목록을 노출한다.
-- `NovelEngine`는 이제 workspace/state/file 제어를 맡고, Codex 기반 scene/review/rewrite/world generation은 주입 가능한 `NovelBackend` 경계 뒤로 분리됐다.
-- LLM 호출 경계도 `PromptRunner` 추상화로 분리되어, Codex 외 CLI runner를 추가해도 planner/writer/editor/critic orchestration을 재사용할 수 있다.
+- `doctor` 명령이 workspace 상태, 필수 novel 설정, 선택된 LLM backend(Codex/Gemini/Claude Code) 연결, fallback 설정을 진단한다.
+- 전역 설정 `llm_backend`와 `doctor`/`capabilities` 출력이 현재 선택 backend와 지원 backend 목록(`codex_cli`, `gemini_cli`, `claude_code`)을 노출한다.
+- `NovelEngine`는 이제 workspace/state/file 제어를 맡고, LLM 기반 scene/review/rewrite/world generation은 주입 가능한 `NovelBackend` 경계 뒤로 분리됐다.
+- LLM 호출 경계도 `PromptRunner` 추상화로 분리되어, `CodexRunner` / `GeminiRunner` / `ClaudeCodeRunner`가 동일 trait를 구현한다. `NovelEngine::new`는 `Config::llm_backend`에 따라 적절한 runner를 1회 dispatch 한다.
 - planner/critic payload는 이제 더 엄격한 JSON schema validation을 거치며, malformed payload는 `invalid_llm_payload` 계열 에러로 실패한다.
 - `novel.toml`은 작가용 주석과 함께 `bundle_scene_target` 기본값을 노출하며, 기본 drafting 구조를 `incident -> escalation -> cliffhanger`로 안내한다.
 - project-level 문체 제어를 위해 `03_StoryBible/Voice/` 문서를 foundation에 포함하고, named-author imitation 대신 style/tone/genre/voice guide를 읽도록 방향을 잡았다.
@@ -56,13 +56,14 @@
 - `CodexRunner`는 호출 실패 시 1회 재시도한다.
 - `CodexRunner`는 응답 timeout을 넘기면 subprocess를 강제 종료한다.
 - `CodexRunner`는 `--json` + `--output-last-message` 조합으로 Codex 진행 이벤트를 읽고, agent별 더 긴 timeout(writer/critic 등)과 stderr progress 표시를 사용한다.
+- `GeminiRunner`와 `ClaudeCodeRunner`는 단순 stdout 캡처 + timeout/SIGKILL 경계만 구현한다. JSON 진행 이벤트 파싱, 재시도, agent별 timeout 확장은 하지 않는다. opt-in prompt logging은 둘 다 지원한다.
 - 바이너리 테스트가 하위 디렉터리 실행 시 nearest workspace 자동 탐색을 검증한다.
 - 바이너리 테스트가 `rewrite`/`approve`의 JSON 출력, 산출물 보존, 상태 전이를 검증한다.
 - 바이너리 테스트가 `init`, `status`, `next-scene`, `review`, `rewrite`, `approve`, `next-bundle`, `expand-world`, `memory`, `show` 전 커맨드의 JSON 계약을 검증한다.
 - 바이너리 테스트가 `review`의 current scene 부재, `next-bundle`의 empty/gapped bundle, `show`의 미존재 scene 조회 같은 고위험 실패 경로의 JSON 에러 계약도 검증한다.
 - 바이너리 테스트가 기본 codex 실패 시 `codex_unavailable` 에러와 opt-in dummy fallback warning 노출도 검증한다.
 - `NovelEngine`가 scene 생성, 리뷰, 수정, 승인, bundle 컴파일, memory 조회를 오케스트레이션한다.
-- `CodexRunner`는 `codex` CLI subprocess만 사용하도록 구현되어 있다.
+- `CodexRunner`, `GeminiRunner`, `ClaudeCodeRunner`는 각각 본인 CLI subprocess만 호출하도록 분리되어 있다.
 - `StateManager`와 `MemoryManager`가 기본 파일 생성과 로드/저장을 처리한다.
 - smoke test 파일 `tests/smoke.rs`가 존재한다.
 
@@ -96,11 +97,13 @@
 - 로컬 release asset을 만든 뒤 `PIUROFORGE_DOWNLOAD_URL=file://... ./install.sh` 설치 smoke check가 통과했다.
 - `v1.0.0` tag push 후 GitHub Actions release workflow가 성공적으로 release 자산을 게시했다.
 - hang 재현 테스트에서 `codex exec` timeout과 no-retry 동작이 검증됐다.
-- 요구된 문서 파일인 `README.md`, `.env.example`, `AGENTS.md`, `SPEC.md`, `STATE.md`가 존재한다.
+- 요구된 문서 파일인 `README.md`, `.env.example`, `CLAUDE.md`, `SPEC.md`, `STATE.md`가 존재한다.
+- multi-backend 확장 후 `cargo build`와 `cargo test`가 모두 통과한다 (codex_runner/gemini_runner/claude_code_runner 통합 테스트 + smoke + cli_output 합 75건).
 
 ## Not Yet Verified
 
 - GitHub Release 원격 URL에서 실제 `install.sh` end-to-end 설치는 아직 별도 smoke check를 다시 돌리지 않았다.
+- 실제 `gemini` CLI와 `claude` CLI에 로그인된 환경에서 `piuroforge --workspace <ws> doctor` 및 `piuroforge next-scene` end-to-end smoke run은 아직 수행되지 않았다. fake script 기반 통합 테스트(`tests/gemini_runner.rs`, `tests/claude_code_runner.rs`)까지만 검증됐다.
 
 ## Known Gaps / Risks
 
@@ -112,6 +115,6 @@
 
 ## Recommended Next Actions
 
-1. bundle/arc summary memory를 자동 생성한다.
-2. `doctor` 명령에 backend별 설치/로그인 가이드를 확장한다.
+1. 실제 `gemini` CLI / `claude` CLI에 로그인된 환경에서 `piuroforge --workspace <ws> doctor`와 `piuroforge next-scene` end-to-end smoke run을 한 번씩 돌린다.
+2. bundle/arc summary memory를 자동 생성한다.
 3. GitHub Release 원격 자산을 대상으로 `install.sh` end-to-end smoke check를 한 번 더 수행한다.

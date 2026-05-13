@@ -6,7 +6,6 @@ use crate::agents::critic::CriticAgent;
 use crate::agents::editor::EditorAgent;
 use crate::agents::planner::PlannerAgent;
 use crate::agents::writer::WriterAgent;
-use crate::codex_runner::CodexRunner;
 use crate::config::NovelSettings;
 use crate::llm_runner::PromptRunner;
 use crate::models::{
@@ -124,10 +123,6 @@ pub struct CliNovelBackend {
 impl CliNovelBackend {
     pub fn new(runner: Arc<dyn PromptRunner>) -> Self {
         Self { runner }
-    }
-
-    pub fn codex(runner: CodexRunner) -> Self {
-        Self::new(Arc::new(runner))
     }
 }
 
@@ -316,37 +311,6 @@ Core memory:\n{core}\n\nStory memory:\n{story}\n\nActive memory:\n{active}\n",
             expansion,
             warnings,
         })
-    }
-}
-
-#[derive(Clone)]
-pub struct CodexNovelBackend {
-    inner: CliNovelBackend,
-}
-
-impl CodexNovelBackend {
-    pub fn new(runner: CodexRunner) -> Self {
-        Self {
-            inner: CliNovelBackend::codex(runner),
-        }
-    }
-}
-
-impl NovelBackend for CodexNovelBackend {
-    fn generate_scene(&self, request: SceneGenerationRequest) -> Result<SceneGenerationResponse> {
-        self.inner.generate_scene(request)
-    }
-
-    fn review_scene(&self, request: ReviewRequest) -> Result<ReviewResponse> {
-        self.inner.review_scene(request)
-    }
-
-    fn rewrite_scene(&self, request: RewriteRequest) -> Result<RewriteResponse> {
-        self.inner.rewrite_scene(request)
-    }
-
-    fn expand_world(&self, request: WorldExpansionRequest) -> Result<WorldExpansionResponse> {
-        self.inner.expand_world(request)
     }
 }
 

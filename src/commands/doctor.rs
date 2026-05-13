@@ -1,11 +1,15 @@
 use anyhow::Result;
 use std::io;
 use std::process::Command;
+use std::sync::Arc;
 use std::time::Duration;
 
+use crate::claude_code_runner::ClaudeCodeRunner;
 use crate::codex_runner::CodexRunner;
 use crate::config::{Config, SUPPORTED_LLM_BACKENDS};
+use crate::gemini_runner::GeminiRunner;
 use crate::launch_contract::validate_launch_contract;
+use crate::llm_runner::PromptRunner;
 use crate::output::CommandOutput;
 
 pub fn run(config: &Config) -> Result<CommandOutput> {
@@ -13,18 +17,19 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
     let workspace_config_exists = config.workspace_config_path.exists();
     let global_config_exists = config.global_config_path.exists();
     let missing_fields = config.novel_settings.missing_required_fields();
+    let backend = BackendDescriptor::from(config);
 
-    let version_probe = probe_codex_version(&config.codex_command);
-    let codex_cli_status = match &version_probe {
-        CodexVersionProbe::Ready { .. } => "installed",
-        CodexVersionProbe::Missing => "missing",
-        CodexVersionProbe::Failed { .. } => "error",
+    let version_probe = probe_cli_version(backend.command);
+    let backend_cli_status = match &version_probe {
+        CliVersionProbe::Ready { .. } => "installed",
+        CliVersionProbe::Missing => "missing",
+        CliVersionProbe::Failed { .. } => "error",
     };
-    let codex_version = match &version_probe {
-        CodexVersionProbe::Ready { version } => version.clone(),
+    let backend_version = match &version_probe {
+        CliVersionProbe::Ready { version } => version.clone(),
         _ => "-".to_string(),
     };
-    let probe_timeout_secs = config.codex_timeout_secs.min(15);
+    let probe_timeout_secs = backend.timeout_secs.min(15);
 
     let mut warnings = Vec::new();
     let mut next_steps = Vec::new();
@@ -71,51 +76,63 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
         ));
     }
 
-    let codex_connection = match version_probe {
-        CodexVersionProbe::Missing => {
-            warnings.push(
-                "Codex CLI was not found on this machine. Install Codex CLI first, then run `codex login`."
-                    .to_string(),
-            );
-            next_steps.push("Install Codex CLI".to_string());
-            next_steps.push("codex login".to_string());
-            CodexConnection::Missing
-        }
-        CodexVersionProbe::Failed { detail } => {
+    let backend_connection = match version_probe {
+        CliVersionProbe::Missing => {
             warnings.push(format!(
-                "Codex CLI exists but `--version` failed: {}.",
-                detail
+                "{label} CLI was not found on this machine. Install {label} CLI first, then run `{login}`.",
+                label = backend.label,
+                login = backend.login_command,
             ));
-            next_steps.push("Open a terminal and run: codex login".to_string());
-            CodexConnection::Unavailable
+            next_steps.push(format!("Install {} CLI", backend.label));
+            next_steps.push(backend.login_command.to_string());
+            BackendConnection::Missing
         }
-        CodexVersionProbe::Ready { .. } => match probe_codex_connection(config) {
-            Ok(()) => CodexConnection::Ready,
+        CliVersionProbe::Failed { detail } => {
+            warnings.push(format!(
+                "{label} CLI exists but `--version` failed: {detail}.",
+                label = backend.label,
+            ));
+            next_steps.push(format!(
+                "Open a terminal and run: {}",
+                backend.login_command
+            ));
+            BackendConnection::Unavailable
+        }
+        CliVersionProbe::Ready { .. } => match probe_backend_connection(config, &backend) {
+            Ok(()) => BackendConnection::Ready,
             Err(error) => {
                 if looks_like_network_error(&error) {
-                    warnings.push(
-                        "Codex CLI is installed, but this machine could not reach the Codex service. Check internet, DNS, VPN, or proxy settings."
-                            .to_string(),
-                    );
+                    warnings.push(format!(
+                        "{label} CLI is installed, but this machine could not reach the {label} service. Check internet, DNS, VPN, or proxy settings.",
+                        label = backend.label,
+                    ));
                 } else {
-                    warnings.push(
-                        "Codex CLI is installed, but the live Codex check did not complete. Run `codex login` again and retry."
-                            .to_string(),
-                    );
+                    warnings.push(format!(
+                        "{label} CLI is installed, but the live check did not complete. Run `{login}` again and retry.",
+                        label = backend.label,
+                        login = backend.login_command,
+                    ));
                 }
-                warnings.push(format!("Codex check detail: {}.", compact_message(&error)));
-                next_steps.push("Open a terminal and run: codex login".to_string());
+                warnings.push(format!(
+                    "{} check detail: {}.",
+                    backend.label,
+                    compact_message(&error)
+                ));
+                next_steps.push(format!(
+                    "Open a terminal and run: {}",
+                    backend.login_command
+                ));
                 next_steps.push("piuroforge doctor".to_string());
-                CodexConnection::Unavailable
+                BackendConnection::Unavailable
             }
         },
     };
 
     if config.allow_dummy_fallback {
-        warnings.push(
-            "Dummy fallback is ON. PiuroForge can produce placeholder text instead of live Codex output."
-                .to_string(),
-        );
+        warnings.push(format!(
+            "Dummy fallback is ON. PiuroForge can produce placeholder text instead of live {} output.",
+            backend.label
+        ));
     }
 
     let mut launch_contract_has_blocking_issues = false;
@@ -136,7 +153,7 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
     let ready_to_draft = workspace_manifest_exists
         && workspace_config_exists
         && missing_fields.is_empty()
-        && matches!(codex_connection, CodexConnection::Ready)
+        && matches!(backend_connection, BackendConnection::Ready)
         && !config.allow_dummy_fallback
         && !launch_contract_has_blocking_issues;
 
@@ -148,9 +165,12 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
     } else if workspace_manifest_exists
         && workspace_config_exists
         && missing_fields.is_empty()
-        && !matches!(codex_connection, CodexConnection::Ready)
+        && !matches!(backend_connection, BackendConnection::Ready)
     {
-        next_steps.push("Open a terminal and run: codex login".to_string());
+        next_steps.push(format!(
+            "Open a terminal and run: {}",
+            backend.login_command
+        ));
     }
 
     if config.allow_dummy_fallback {
@@ -167,7 +187,7 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
 
     let mut output = CommandOutput::ok("doctor", &config.workspace_dir, summary)
         .detail("llm_backend", &config.llm_backend)
-        .detail("auth_mode", "codex_cli")
+        .detail("auth_mode", &config.llm_backend)
         .detail("setup_flow", "init_then_doctor")
         .detail("supported_llm_backends", SUPPORTED_LLM_BACKENDS.join(", "))
         .detail(
@@ -177,10 +197,15 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
         .detail("workspace_manifest", yes_no(workspace_manifest_exists))
         .detail("workspace_config", yes_no(workspace_config_exists))
         .detail("global_config", yes_no(global_config_exists))
+        .detail("backend_command", backend.command.to_string())
+        .detail("backend_cli", backend_cli_status)
+        .detail("backend_version", backend_version)
+        .detail("backend_connection", backend_connection.as_str())
+        .detail("backend_login_command", backend.login_command.to_string())
+        // Compat aliases for existing agent integrations that look for `codex_*` keys.
         .detail("codex_command", config.codex_command.clone())
-        .detail("codex_cli", codex_cli_status)
-        .detail("codex_version", codex_version)
-        .detail("codex_connection", codex_connection.as_str())
+        .detail("codex_cli", backend_cli_status)
+        .detail("codex_connection", backend_connection.as_str())
         .detail("codex_probe_timeout_secs", probe_timeout_secs.to_string())
         .detail(
             "allow_dummy_fallback",
@@ -196,7 +221,7 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
         )
         .detail(
             "setup_complete_when",
-            "doctor reports codex_connection=ready and missing_required_fields=none",
+            "doctor reports backend_connection=ready and missing_required_fields=none",
         )
         .artifact("global_config", &config.global_config_path);
 
@@ -231,10 +256,11 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
 
     output = output.body(render_doctor_body(
         &config.llm_backend,
+        backend.label,
         workspace_manifest_exists,
         workspace_config_exists,
         &missing_fields,
-        &codex_connection,
+        &backend_connection,
         config.allow_dummy_fallback,
         config.workspace_auto_commit,
         launch_contract_report
@@ -246,21 +272,53 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
     Ok(output)
 }
 
+struct BackendDescriptor<'a> {
+    label: &'static str,
+    login_command: &'static str,
+    command: &'a str,
+    timeout_secs: u64,
+}
+
+impl<'a> BackendDescriptor<'a> {
+    fn from(config: &'a Config) -> Self {
+        match config.llm_backend.as_str() {
+            "gemini_cli" => Self {
+                label: "Gemini",
+                login_command: "gemini",
+                command: &config.gemini_command,
+                timeout_secs: config.gemini_timeout_secs,
+            },
+            "claude_code" => Self {
+                label: "Claude Code",
+                login_command: "claude login",
+                command: &config.claude_code_command,
+                timeout_secs: config.claude_code_timeout_secs,
+            },
+            _ => Self {
+                label: "Codex",
+                login_command: "codex login",
+                command: &config.codex_command,
+                timeout_secs: config.codex_timeout_secs,
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
-enum CodexVersionProbe {
+enum CliVersionProbe {
     Ready { version: String },
     Missing,
     Failed { detail: String },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CodexConnection {
+enum BackendConnection {
     Ready,
     Unavailable,
     Missing,
 }
 
-impl CodexConnection {
+impl BackendConnection {
     fn as_str(self) -> &'static str {
         match self {
             Self::Ready => "ready",
@@ -270,9 +328,9 @@ impl CodexConnection {
     }
 }
 
-fn probe_codex_version(command: &str) -> CodexVersionProbe {
+fn probe_cli_version(command: &str) -> CliVersionProbe {
     match Command::new(command).arg("--version").output() {
-        Ok(output) if output.status.success() => CodexVersionProbe::Ready {
+        Ok(output) if output.status.success() => CliVersionProbe::Ready {
             version: String::from_utf8_lossy(&output.stdout).trim().to_string(),
         },
         Ok(output) => {
@@ -282,25 +340,35 @@ fn probe_codex_version(command: &str) -> CodexVersionProbe {
             } else {
                 detail
             };
-            CodexVersionProbe::Failed { detail }
+            CliVersionProbe::Failed { detail }
         }
-        Err(error) if error.kind() == io::ErrorKind::NotFound => CodexVersionProbe::Missing,
-        Err(error) => CodexVersionProbe::Failed {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => CliVersionProbe::Missing,
+        Err(error) => CliVersionProbe::Failed {
             detail: error.to_string(),
         },
     }
 }
 
-fn probe_codex_connection(config: &Config) -> Result<()> {
-    let runner = CodexRunner::new(
-        config.codex_command.clone(),
-        Duration::from_secs(config.codex_timeout_secs.min(15)),
-    );
+fn probe_backend_connection(config: &Config, backend: &BackendDescriptor) -> Result<()> {
+    let probe_timeout = Duration::from_secs(backend.timeout_secs.min(15));
+    let runner = build_probe_runner(&config.llm_backend, backend.command, probe_timeout);
     let response = runner.run_prompt_named("doctor", "Reply with OK only.")?;
     if response.trim().is_empty() {
-        anyhow::bail!("codex returned an empty healthcheck response");
+        anyhow::bail!("{} returned an empty healthcheck response", backend.label);
     }
     Ok(())
+}
+
+fn build_probe_runner(
+    llm_backend: &str,
+    command: &str,
+    timeout: Duration,
+) -> Arc<dyn PromptRunner> {
+    match llm_backend {
+        "gemini_cli" => Arc::new(GeminiRunner::new(command.to_string(), timeout)),
+        "claude_code" => Arc::new(ClaudeCodeRunner::new(command.to_string(), timeout)),
+        _ => Arc::new(CodexRunner::new(command.to_string(), timeout)),
+    }
 }
 
 fn render_missing_fields(missing_fields: &[&str]) -> String {
@@ -313,10 +381,11 @@ fn render_missing_fields(missing_fields: &[&str]) -> String {
 
 fn render_doctor_body(
     llm_backend: &str,
+    backend_label: &str,
     workspace_manifest_exists: bool,
     workspace_config_exists: bool,
     missing_fields: &[&str],
-    codex_connection: &CodexConnection,
+    backend_connection: &BackendConnection,
     allow_dummy_fallback: bool,
     workspace_auto_commit: bool,
     launch_contract_state: &str,
@@ -331,10 +400,10 @@ fn render_doctor_body(
     } else {
         "required novel settings still need attention"
     };
-    let codex_state = match codex_connection {
-        CodexConnection::Ready => "live Codex check succeeded",
-        CodexConnection::Unavailable => "live Codex check failed",
-        CodexConnection::Missing => "Codex CLI is missing",
+    let backend_state = match backend_connection {
+        BackendConnection::Ready => format!("live {backend_label} check succeeded"),
+        BackendConnection::Unavailable => format!("live {backend_label} check failed"),
+        BackendConnection::Missing => format!("{backend_label} CLI is missing"),
     };
     let fallback_state = if allow_dummy_fallback {
         "dummy fallback is ON"
@@ -356,7 +425,7 @@ fn render_doctor_body(
     };
 
     format!(
-        "PiuroForge Doctor\n\n- LLM backend: {llm_backend}\n- Workspace: {workspace_state}\n- Novel config: {config_state}\n- Codex: {codex_state}\n- Fallback: {fallback_state}\n- Workspace Git auto-commit: {git_state}\n- Launch contract: {launch_state}\n\nIf Doctor says ready, PiuroForge setup is finished and you can move on to `piuroforge next-scene`.\n\nIf you run PiuroForge through another assistant, IDE agent, or sandboxed tool, that host may still ask for its own approval prompts. Those prompts are outside PiuroForge."
+        "PiuroForge Doctor\n\n- LLM backend: {llm_backend}\n- Workspace: {workspace_state}\n- Novel config: {config_state}\n- {backend_label}: {backend_state}\n- Fallback: {fallback_state}\n- Workspace Git auto-commit: {git_state}\n- Launch contract: {launch_state}\n\nIf Doctor says ready, PiuroForge setup is finished and you can move on to `piuroforge next-scene`.\n\nIf you run PiuroForge through another assistant, IDE agent, or sandboxed tool, that host may still ask for its own approval prompts. Those prompts are outside PiuroForge."
     )
 }
 

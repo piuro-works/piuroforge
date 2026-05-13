@@ -115,16 +115,17 @@ fn workspace_root_readme(title: &str) -> String {
         "# {}\n\n\
 This workspace separates human-facing manuscript files from PiuroForge runtime data.\n\n\
 ## First Run Checklist\n\n\
-1. Open a terminal once and run `codex login`.\n\
-2. Run `piuroforge doctor` in this workspace before the first real scene.\n\
-3. Before the first serious scene, fill at least one project brief, one plot note, one character or world note, and one style/tone guide if possible.\n\
-4. Treat `scene` as the primary draft unit. In serialized workflows, one scene usually maps to one upload episode.\n\
-5. Keep the default scene rhythm inside each internal bundle simple: incident -> escalation -> cliffhanger.\n\
-6. If Doctor says ready, your PiuroForge setup is finished. You can move on to `piuroforge next-scene`.\n\
-7. Open `~/.config/piuroforge/config.toml` if you want to review your PiuroForge settings.\n\
-8. Leave `allow_dummy_fallback = false` for real drafting. Turn it on only if you intentionally want placeholder text while testing the folder workflow.\n\
-9. If you want automatic Git history for this novel workspace, turn on `workspace_auto_commit = true` in the same config file.\n\n\
-If `next-scene` fails with `codex_unavailable`, that usually means either `codex login` is not finished yet or this machine cannot reach the Codex service because of internet, DNS, VPN, or proxy issues.\n\n\
+1. Pick an LLM backend in `~/.config/piuroforge/config.toml` (`llm_backend` = `codex_cli`, `gemini_cli`, or `claude_code`; default is `codex_cli`).\n\
+2. Log in to the matching CLI once: `codex login`, or run `gemini` once for Google OAuth, or `claude login` for Claude Code.\n\
+3. Run `piuroforge doctor` in this workspace before the first real scene.\n\
+4. Before the first serious scene, fill at least one project brief, one plot note, one character or world note, and one style/tone guide if possible.\n\
+5. Treat `scene` as the primary draft unit. In serialized workflows, one scene usually maps to one upload episode.\n\
+6. Keep the default scene rhythm inside each internal bundle simple: incident -> escalation -> cliffhanger.\n\
+7. If Doctor says ready, your PiuroForge setup is finished. You can move on to `piuroforge next-scene`.\n\
+8. Open `~/.config/piuroforge/config.toml` if you want to review your PiuroForge settings.\n\
+9. Leave `allow_dummy_fallback = false` for real drafting. Turn it on only if you intentionally want placeholder text while testing the folder workflow.\n\
+10. If you want automatic Git history for this novel workspace, turn on `workspace_auto_commit = true` in the same config file.\n\n\
+If `next-scene` fails with `codex_unavailable`, that usually means the selected backend CLI is not logged in yet, or this machine cannot reach that backend's service because of internet, DNS, VPN, or proxy issues.\n\n\
 If you run PiuroForge through another assistant, IDE agent, or sandboxed tool, that host may still ask for its own approval prompts. Those prompts are outside PiuroForge.\n\n\
 ## Human Folders\n\n\
 - `00_Inbox/`: raw captures, scraps, and external notes\n\

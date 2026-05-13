@@ -5,8 +5,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crate::claude_code_runner::ClaudeCodeRunner;
 use crate::codex_runner::CodexRunner;
 use crate::config::Config;
+use crate::gemini_runner::GeminiRunner;
 use crate::memory_manager::MemoryManager;
 use crate::models::{
     derive_short_title, slug_fragment, MemoryBundle, OperationResult, ReviewIssue, ReviewOutcome,
@@ -14,7 +16,7 @@ use crate::models::{
 };
 use crate::launch_contract::validate_launch_contract;
 use crate::novel_backend::{
-    CodexNovelBackend, NovelBackend, ReviewRequest, RewriteRequest, SceneGenerationRequest,
+    CliNovelBackend, NovelBackend, ReviewRequest, RewriteRequest, SceneGenerationRequest,
     WorldExpansionRequest,
 };
 use crate::state_manager::StateManager;
@@ -36,21 +38,40 @@ pub struct NovelEngine {
 
 impl NovelEngine {
     pub fn new(config: Config) -> Result<Self> {
+        let prompt_log_dir = config.logs_dir.join("llm_prompts");
         match config.llm_backend.as_str() {
             "codex_cli" => {
-                let mut codex_runner = CodexRunner::new(
+                let mut runner = CodexRunner::new(
                     config.codex_command.clone(),
                     Duration::from_secs(config.codex_timeout_secs),
                 );
                 if config.log_prompts {
-                    codex_runner =
-                        codex_runner.with_prompt_logging(config.logs_dir.join("llm_prompts"));
+                    runner = runner.with_prompt_logging(prompt_log_dir);
                 }
-
-                Self::with_backend(config, Arc::new(CodexNovelBackend::new(codex_runner)))
+                Self::with_backend(config, Arc::new(CliNovelBackend::new(Arc::new(runner))))
+            }
+            "gemini_cli" => {
+                let mut runner = GeminiRunner::new(
+                    config.gemini_command.clone(),
+                    Duration::from_secs(config.gemini_timeout_secs),
+                );
+                if config.log_prompts {
+                    runner = runner.with_prompt_logging(prompt_log_dir);
+                }
+                Self::with_backend(config, Arc::new(CliNovelBackend::new(Arc::new(runner))))
+            }
+            "claude_code" => {
+                let mut runner = ClaudeCodeRunner::new(
+                    config.claude_code_command.clone(),
+                    Duration::from_secs(config.claude_code_timeout_secs),
+                );
+                if config.log_prompts {
+                    runner = runner.with_prompt_logging(prompt_log_dir);
+                }
+                Self::with_backend(config, Arc::new(CliNovelBackend::new(Arc::new(runner))))
             }
             backend => Err(anyhow!(
-                "unsupported llm backend `{backend}`. supported backends: codex_cli"
+                "unsupported llm backend `{backend}`. supported backends: codex_cli, gemini_cli, claude_code"
             )),
         }
     }

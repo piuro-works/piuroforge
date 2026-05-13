@@ -149,32 +149,46 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
     let supported_backends = SUPPORTED_LLM_BACKENDS
         .iter()
         .map(|name| {
+            let (login_cmd, description) = backend_help(name);
             json!({
                 "name": name,
                 "default": *name == "codex_cli",
-                "auth_mode": "codex_cli",
-                "requires_login_command": "codex login",
-                "description": "Use the logged-in Codex CLI subprocess as the novel generation backend."
+                "auth_mode": *name,
+                "requires_login_command": login_cmd,
+                "description": description,
             })
         })
         .collect::<Vec<_>>();
 
+    let auth_modes = SUPPORTED_LLM_BACKENDS
+        .iter()
+        .map(|name| {
+            let (_, description) = backend_help(name);
+            json!({
+                "name": name,
+                "default": *name == "codex_cli",
+                "description": description,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let (active_login_cmd, _) = backend_help(config.llm_backend.as_str());
+    let required_installs = match config.llm_backend.as_str() {
+        "gemini_cli" => vec!["piuroforge", "Gemini CLI"],
+        "claude_code" => vec!["piuroforge", "Claude Code CLI"],
+        _ => vec!["piuroforge", "codex CLI"],
+    };
+
     let data = json!({
-        "auth_mode": "codex_cli",
+        "auth_mode": config.llm_backend,
         "selected_backend": config.llm_backend,
         "supported_backends": supported_backends,
-        "auth_modes": [
-            {
-                "name": "codex_cli",
-                "default": true,
-                "description": "PiuroForge does not perform OAuth directly. Install Codex CLI and run `codex login` first."
-            }
-        ],
-        "required_installs": ["piuroforge", "codex CLI"],
+        "auth_modes": auth_modes,
+        "required_installs": required_installs,
         "recommended_setup_sequence": [
             "install piuroforge",
-            "install Codex CLI",
-            "codex login",
+            format!("install the CLI for the selected backend ({})", config.llm_backend),
+            format!("log in to the backend CLI ({active_login_cmd})"),
             "piuroforge init <workspace>",
             "piuroforge --workspace <workspace> doctor",
             "follow next_steps until doctor is ready"
@@ -188,9 +202,9 @@ pub fn run(config: &Config) -> Result<CommandOutput> {
             "Use --format json for stable machine-readable output.",
             "Use --agent to request compact text output and explicit agent_mode markers.",
             "Commands that mutate the workspace may auto-commit if workspace_auto_commit is enabled.",
-            "Commands that require Codex will fail with codex_unavailable unless Codex is installed, logged in, and reachable.",
+            "Commands that require the LLM backend will fail with codex_unavailable unless the configured CLI (codex/gemini/claude) is installed, logged in, and reachable.",
             "Call capabilities first, then doctor, then status before mutating commands.",
-            "Current auth mode is codex_cli only. PiuroForge expects `codex login` instead of direct OAuth."
+            "Supported auth modes: codex_cli, gemini_cli, claude_code. PiuroForge never performs OAuth directly; the backend CLI handles login."
         ]
     });
 
@@ -207,7 +221,7 @@ Prefer `capabilities`, then `doctor`, then `status` before mutating commands.";
         "PiuroForge agent contract and command capabilities.",
     )
     .detail("llm_backend", &config.llm_backend)
-    .detail("auth_mode", "codex_cli")
+    .detail("auth_mode", &config.llm_backend)
     .detail("setup_flow", "init_then_doctor")
     .detail("recommended_format", "json")
     .detail("recommended_flag", "--agent")
@@ -215,4 +229,21 @@ Prefer `capabilities`, then `doctor`, then `status` before mutating commands.";
     .detail("command_count", commands.len().to_string())
     .body(body)
     .data(data))
+}
+
+fn backend_help(name: &str) -> (&'static str, &'static str) {
+    match name {
+        "gemini_cli" => (
+            "gemini",
+            "Use the logged-in Gemini CLI subprocess (Google OAuth handled by the gemini CLI itself).",
+        ),
+        "claude_code" => (
+            "claude login",
+            "Use the logged-in Claude Code CLI subprocess (Anthropic OAuth handled by the claude CLI itself).",
+        ),
+        _ => (
+            "codex login",
+            "Use the logged-in Codex CLI subprocess as the novel generation backend.",
+        ),
+    }
 }

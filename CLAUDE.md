@@ -1,4 +1,4 @@
-# AGENTS.md
+# CLAUDE.md
 
 ## Purpose
 
@@ -6,10 +6,11 @@
 
 ## Hard Constraints
 
-- OpenAI API를 직접 호출하지 않는다.
+- OpenAI/Anthropic/Google API를 직접 호출하지 않는다.
 - API 키 기반 구현을 추가하지 않는다.
 - OAuth 토큰을 직접 처리하지 않는다.
-- LLM 호출은 `codex` CLI subprocess만 사용한다.
+- LLM 호출은 등록된 CLI subprocess backend (`codex_cli`, `gemini_cli`, `claude_code`) 중 하나만 사용한다. 로그인은 각 CLI 자체 인증(`codex login`, `gemini` OAuth, `claude` login)으로 위임한다.
+- 새 backend는 `PromptRunner` trait 뒤에 두고, 다른 모듈은 backend 종류에 직접 의존하지 않는다.
 - 단일 바이너리 빌드를 유지한다.
 - 동기식 구조를 기본으로 유지한다. 비동기 전환은 명확한 병목이 확인되기 전에는 하지 않는다.
 
@@ -28,8 +29,9 @@
 - 상태는 `.novel/state/project_state.json`으로 관리한다.
 - 메모리는 `.novel/memory/*.md`로 관리한다.
 - 테스트 가능성을 위해 dummy fallback 경로를 유지한다.
-- `CodexRunner`는 subprocess 경계다. 다른 모듈에서 직접 `codex`를 호출하지 않는다.
-- `NovelEngine`는 workspace/state/file 제어에 집중하고, Codex generation은 backend 경계 뒤에 둔다.
+- `CodexRunner`, `GeminiRunner`, `ClaudeCodeRunner`는 각각 subprocess 경계다. 다른 모듈에서 직접 CLI를 호출하지 않는다.
+- backend dispatch는 `NovelEngine::new`의 `config.llm_backend` 매칭에서만 일어난다. planner/writer/editor/critic은 `PromptRunner`만 본다.
+- `NovelEngine`는 workspace/state/file 제어에 집중하고, generation은 backend 경계 뒤에 둔다.
 
 ## Change Checklist
 

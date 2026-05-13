@@ -175,7 +175,7 @@ fn doctor_json_reports_setup_issues_without_workspace() -> Result<()> {
     assert_eq!(detail_value(&payload, "codex_connection"), Some("missing"));
     assert_eq!(
         detail_value(&payload, "supported_llm_backends"),
-        Some("codex_cli")
+        Some("codex_cli, gemini_cli, claude_code")
     );
     assert!(warning_contains(&payload, "No PiuroForge workspace marker"));
     assert!(warning_contains(&payload, "Codex CLI was not found"));
@@ -259,7 +259,7 @@ fn status_json_error_for_unsupported_llm_backend_is_structured() -> Result<()> {
 
     std::fs::write(
         global_dir.join("config.toml"),
-        "version = 1\nllm_backend = \"gemini_cli\"\ncodex_command = \"codex\"\nallow_dummy_fallback = false\nlog_prompts = false\nworkspace_auto_commit = false\ndefault_language = \"ko\"\n",
+        "version = 1\nllm_backend = \"openai_api\"\ncodex_command = \"codex\"\nallow_dummy_fallback = false\nlog_prompts = false\nworkspace_auto_commit = false\ndefault_language = \"ko\"\n",
     )?;
 
     let output = Command::new(novel_bin())
@@ -288,7 +288,7 @@ fn status_json_error_for_unsupported_llm_backend_is_structured() -> Result<()> {
         .any(|item| item
             .as_str()
             .unwrap_or_default()
-            .contains("llm_backend = \"codex_cli\"")));
+            .contains("\"codex_cli\", \"gemini_cli\", \"claude_code\"")));
 
     Ok(())
 }

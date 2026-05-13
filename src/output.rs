@@ -328,7 +328,7 @@ impl ErrorOutput {
                 error_code: "unsupported_llm_backend".to_string(),
                 reason,
                 remediation: vec![
-                    "Open ~/.config/piuroforge/config.toml and set llm_backend = \"codex_cli\"."
+                    "Open ~/.config/piuroforge/config.toml and set llm_backend to one of: \"codex_cli\", \"gemini_cli\", \"claude_code\"."
                         .to_string(),
                     "If you intended to use a custom backend, install a PiuroForge build that includes that backend first."
                         .to_string(),
@@ -365,21 +365,22 @@ impl ErrorOutput {
             };
         }
 
-        if looks_like_codex_error(&reason) {
-            let mut remediation = vec!["Open a terminal and run: codex login".to_string()];
+        if looks_like_backend_error(&reason) {
+            let login_hint = backend_login_hint(&reason);
+            let backend_label = backend_label_for(&reason);
+            let mut remediation = vec![format!("Open a terminal and run: {login_hint}")];
             if looks_like_network_error(&reason) {
                 remediation.push(
                     "If login is already done, check the internet connection, DNS, VPN, or proxy on this machine before retrying."
                         .to_string(),
                 );
             } else {
-                remediation.push(
-                    "Retry after confirming that Codex can open normally on this machine."
-                        .to_string(),
-                );
+                remediation.push(format!(
+                    "Retry after confirming that {backend_label} can open normally on this machine."
+                ));
             }
             remediation.push(
-                "If you only want to test the writing workflow without live Codex, open ~/.config/piuroforge/config.toml and set allow_dummy_fallback = true. PiuroForge will then mark placeholder output with warnings."
+                "If you only want to test the writing workflow without a live LLM backend, open ~/.config/piuroforge/config.toml and set allow_dummy_fallback = true. PiuroForge will then mark placeholder output with warnings."
                     .to_string(),
             );
             remediation.push(
@@ -620,10 +621,32 @@ fn example_for(command: &str, workspace: Option<&Path>) -> String {
     }
 }
 
-fn looks_like_codex_error(reason: &str) -> bool {
+fn looks_like_backend_error(reason: &str) -> bool {
     reason.contains("codex login")
         || reason.contains("codex CLI")
         || reason.contains("chatgpt.com/backend-api/codex")
+        || reason.contains("gemini CLI")
+        || reason.contains("claude code CLI")
+}
+
+fn backend_login_hint(reason: &str) -> &'static str {
+    if reason.contains("gemini CLI") {
+        "gemini"
+    } else if reason.contains("claude code CLI") {
+        "claude login"
+    } else {
+        "codex login"
+    }
+}
+
+fn backend_label_for(reason: &str) -> &'static str {
+    if reason.contains("gemini CLI") {
+        "Gemini CLI"
+    } else if reason.contains("claude code CLI") {
+        "Claude Code CLI"
+    } else {
+        "Codex"
+    }
 }
 
 fn looks_like_network_error(reason: &str) -> bool {

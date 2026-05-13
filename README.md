@@ -2,7 +2,13 @@
 
 Rust 기반 CLI-first AI 소설 작성 프레임워크다. 웹 UI 없이 `piuroforge` 명령만으로 scene 생성, 리뷰, 수정, 승인, 상태 확인을 수행한다.
 
-LLM 호출은 직접 OpenAI API 키/OAuth를 다루지 않고, 사용자가 미리 로그인한 `codex` CLI subprocess만 사용한다. `codex`가 실패한 경우 기본 동작은 즉시 에러를 반환하는 것이고, dummy fallback은 명시적으로 opt-in 했을 때만 허용한다.
+LLM 호출은 OpenAI/Anthropic/Google API 키와 OAuth 토큰을 직접 다루지 않는다. 대신 사용자가 미리 로그인한 CLI subprocess를 호출한다. 현재 지원되는 backend는 세 가지다.
+
+- `codex_cli` (기본): `codex login`으로 로그인한 OpenAI Codex CLI
+- `gemini_cli`: 처음 `gemini` 실행 시 브라우저 OAuth로 로그인한 Google Gemini CLI
+- `claude_code`: `claude login` 또는 `/login`으로 로그인한 Anthropic Claude Code CLI
+
+backend가 실패한 경우 기본 동작은 즉시 에러를 반환하는 것이고, dummy fallback은 명시적으로 opt-in 했을 때만 허용한다.
 
 PiuroForge CLI UX는 두 가지 출력 모드를 제공한다.
 
@@ -19,11 +25,11 @@ PiuroForge CLI UX는 두 가지 출력 모드를 제공한다.
 실제 집필 전에 필요한 설치/행동은 이 네 가지다.
 
 1. `piuroforge` 설치
-2. `codex` CLI 설치
-3. 터미널에서 `codex login` 1회 실행
+2. 사용할 backend의 CLI 설치 (`codex`, `gemini`, 또는 `claude` 중 하나)
+3. 해당 CLI에 한 번 로그인 (`codex login`, `gemini`, 또는 `claude login`)
 4. 쓰기 가능한 워크스페이스 폴더 준비
 
-PiuroForge 자체가 OAuth를 직접 처리하지는 않는다. 기본 auth mode는 `codex_cli` 하나이며, 로그인은 항상 `codex login` 기준이다.
+PiuroForge 자체가 OAuth를 직접 처리하지는 않는다. 기본 auth mode는 `codex_cli`이며, `~/.config/piuroforge/config.toml`의 `llm_backend` 값을 `gemini_cli` 또는 `claude_code`로 바꾸면 다른 CLI를 사용한다. 로그인은 각 CLI 본인의 인증 흐름에 위임된다.
 
 ## 처음 5분
 
@@ -113,27 +119,26 @@ curl -fsSL https://raw.githubusercontent.com/piuro-works/piuroforge/main/install
 소스에서 직접 빌드하려면:
 
 1. Rust stable 설치
-2. `codex` CLI 설치
-3. `codex login` 실행
+2. 사용할 backend CLI 설치 (`codex` / `gemini` / `claude` 중 하나)
+3. 해당 CLI 로그인 (`codex login` / `gemini` / `claude login`)
 
-실제 codex 기반 생성/리뷰/수정을 쓰려면 먼저 `codex login`이 되어 있어야 한다.
-기본적으로 `codex exec` 호출은 120초 timeout이 걸려 있으며, 응답이 없으면 subprocess를 종료하고 명확한 에러를 반환한다.
-다만 내부적으로는 agent 역할에 따라 timeout을 다르게 잡는다. writer/critic/expand-world는 planner보다 더 긴 timeout을 사용한다.
-실행 중에는 Codex 진행 상태를 `stderr`로 흘려서, 최종 JSON 출력 계약을 깨지 않으면서도 사용자가 중간 진행을 볼 수 있게 한다.
-기본값에서는 `codex` 실패가 조용히 placeholder prose로 바뀌지 않는다. placeholder output이 필요하면 전역 설정 `allow_dummy_fallback = true` 또는 `PIUROFORGE_ALLOW_DUMMY=true`를 사용자가 직접 켜야 하고, 그 경우에도 CLI 출력과 로그에 fallback warning이 남는다.
+실제 LLM 기반 생성/리뷰/수정을 쓰려면 선택한 backend CLI에 먼저 로그인이 되어 있어야 한다.
+backend별 기본 timeout은 120초이며, 응답이 없으면 subprocess를 종료하고 명확한 에러를 반환한다.
+`codex_cli` backend는 agent 역할별로 timeout을 다르게 잡고, JSON 진행 이벤트를 `stderr`로 흘려 사용자가 중간 진행을 볼 수 있게 한다. `gemini_cli`/`claude_code` backend는 단순 stdout 캡처 방식이라 진행 표시는 없다.
+기본값에서는 backend 실패가 조용히 placeholder prose로 바뀌지 않는다. placeholder output이 필요하면 전역 설정 `allow_dummy_fallback = true` 또는 `PIUROFORGE_ALLOW_DUMMY=true`를 사용자가 직접 켜야 하고, 그 경우에도 CLI 출력과 로그에 fallback warning이 남는다.
 
 작가용 최소 설정 순서:
 
-1. 터미널에서 한 번 `codex login` 실행
+1. 터미널에서 한 번 backend CLI 로그인 (`codex login` / `gemini` / `claude login`)
 2. `piuroforge init <workspace>` 실행
 3. 워크스페이스에서 `piuroforge doctor` 실행
 4. 첫 장면 전에 `01_Brief`, `03_StoryBible/Plot`, `03_StoryBible/Characters` 또는 `03_StoryBible/World`에 최소 문서 하나씩 채우고, 가능하면 `03_StoryBible/Voice`에 style/tone guide도 넣기
 5. `doctor`가 `ready`를 보여주면 PiuroForge 설정은 끝
-6. 필요하면 `~/.config/piuroforge/config.toml` 열기
+6. 필요하면 `~/.config/piuroforge/config.toml` 열기 (`llm_backend`로 backend 선택)
 7. 실제 집필은 `allow_dummy_fallback = false` 유지
 8. 폴더 흐름만 시험하고 싶을 때만 `allow_dummy_fallback = true` 사용
 
-`codex_unavailable`가 나오면 대부분은 로그인 미완료 또는 인터넷/DNS/VPN/프록시 문제다. 이 경우 개발 지식보다도 먼저 `codex login`과 네트워크 상태를 확인하는 쪽이 맞다.
+`codex_unavailable`가 나오면 대부분은 선택된 backend CLI 로그인 미완료 또는 인터넷/DNS/VPN/프록시 문제다. 이 경우 개발 지식보다도 먼저 해당 CLI 로그인과 네트워크 상태를 확인하는 쪽이 맞다.
 
 중요한 구분도 있다. Codex 같은 에이전트, IDE agent, 샌드박스 실행기 안에서 `piuroforge`를 대신 호출하면 그 호스트가 자체 보안 승인창을 띄울 수 있다. 그 승인창은 PiuroForge의 추가 설정 단계가 아니라, 그 호스트 환경의 정책이다. 사용자 본인 터미널에서 직접 `piuroforge`를 실행할 때는 PiuroForge가 별도의 승인 UX를 요구하지 않는다.
 
@@ -280,8 +285,8 @@ git commit -m "Initialize novel workspace"
 Git 확인용으로는 위 바깥 구조와 `novel.toml`을 커밋하고, `.novel/state/`, `.novel/logs/`, `.novel/memory/active_memory.md` 같은 런타임 데이터는 ignore하는 흐름을 권장한다.
 `init`은 루트 `README.md`, 각 주요 섹션 `README.md`, 그리고 `98_Templates/`의 starter template 파일도 함께 생성한다.
 Git을 잘 모르는 사용자라면 전역 설정 `workspace_auto_commit = true` 또는 `PIUROFORGE_WORKSPACE_AUTO_COMMIT=true`로 workspace Git 자동 초기화/자동 커밋을 켤 수 있다. 이 경우 `init`, `next-scene`, `review`, `rewrite`, `approve`, `next-bundle`, `expand-world` 같은 변경 명령 뒤에 workspace repo가 자동으로 commit된다.
-내부 구현은 workspace 제어 엔진과 Codex 소설 생성 backend를 분리했지만, 사용자는 계속 같은 `piuroforge` 명령만 쓰면 된다. backend 분리는 사용자 절차를 늘리기 위한 것이 아니라, 향후 worker/bridge 구조를 숨긴 채 안정성을 높이기 위한 내부 경계다.
-현재 기본 런타임 backend는 `codex_cli` 하나다. 다만 내부 LLM 호출 경계는 `PromptRunner`와 `CliNovelBackend`로 분리되어 있어서, 다른 사람이 Gemini CLI, Claude CLI, Copilot CLI 같은 대체 runner를 추가하더라도 planner/writer/editor/critic orchestration은 재사용할 수 있다. 이런 확장은 사용자 setup flow를 바꾸지 않아야 하며, fake runner 기반 통합 테스트를 함께 추가하는 것을 권장한다.
+내부 구현은 workspace 제어 엔진과 LLM 소설 생성 backend를 분리했지만, 사용자는 계속 같은 `piuroforge` 명령만 쓰면 된다. backend 분리는 사용자 절차를 늘리기 위한 것이 아니라, 향후 worker/bridge 구조를 숨긴 채 안정성을 높이기 위한 내부 경계다.
+현재 공식 런타임 backend는 `codex_cli`(기본), `gemini_cli`, `claude_code` 세 가지다. 내부 LLM 호출 경계는 `PromptRunner`와 `CliNovelBackend`로 분리되어 있어서, 새 CLI runner를 추가하더라도 planner/writer/editor/critic orchestration은 재사용할 수 있다. 이런 확장은 사용자 setup flow를 바꾸지 않아야 하며, fake runner 기반 통합 테스트를 함께 추가하는 것을 권장한다.
 
 워크스페이스 안에서 작업:
 
@@ -320,8 +325,8 @@ piuroforge --workspace ~/novels/my-first-novel --format json --agent doctor
 piuroforge --workspace ~/novels/my-first-novel --format json --agent status
 ```
 
-`capabilities`는 각 명령의 workspace 필요 여부, Codex 필요 여부, workspace 변경 여부를 JSON으로 알려준다.
-현재 JSON payload에는 기본 auth mode와 setup flow도 포함되므로, 외부 에이전트는 README를 파싱하지 않고도 `codex login -> init -> doctor` 순서를 추론할 수 있다.
+`capabilities`는 각 명령의 workspace 필요 여부, LLM backend 필요 여부, workspace 변경 여부를 JSON으로 알려준다.
+JSON payload에는 현재 선택된 auth mode, 지원되는 backend 목록, setup flow가 포함되므로, 외부 에이전트는 README를 파싱하지 않고도 `<backend CLI 로그인> -> init -> doctor` 순서를 추론할 수 있다.
 
 ## OpenClaw 같은 에이전트
 
@@ -334,9 +339,9 @@ OpenClaw 같은 에이전트에는 다음 규칙을 권장한다.
 
 중요한 점:
 
-- 현재 auth mode는 `codex_cli`다.
-- 현재 기본 `llm_backend`는 `codex_cli`다.
-- 에이전트도 직접 OAuth를 추측하지 말고 `codex login` 전제를 따라야 한다.
+- 지원 auth mode는 `codex_cli`, `gemini_cli`, `claude_code` 세 가지다.
+- 기본 `llm_backend`는 `codex_cli`다. 변경은 `~/.config/piuroforge/config.toml`의 `llm_backend` 값으로 한다.
+- 에이전트도 직접 OAuth를 추측하지 말고, 선택된 backend의 자체 로그인 명령(`codex login`, `gemini`, `claude login`) 전제를 따라야 한다.
 - `schema_version`과 `agent_mode`를 먼저 확인하고 파싱하는 쪽이 안전하다.
 
 `--format json`에서 `init`을 실행하면 interactive prompt를 기다리지 않도록 자동으로 non-interactive 모드로 동작한다. 필요한 필드는 flag 또는 `novel.toml` 편집으로 채운다.
@@ -365,9 +370,13 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 
 `.env.example` 참고.
 
+- `PIUROFORGE_LLM_BACKEND`: 기본값 `codex_cli`. 허용값 `codex_cli`, `gemini_cli`, `claude_code`
 - `PIUROFORGE_CODEX_CMD`: 기본값 `codex`
-- `PIUROFORGE_LLM_BACKEND`: 기본값 `codex_cli`
 - `PIUROFORGE_CODEX_TIMEOUT_SECS`: 기본값 `120`
+- `PIUROFORGE_GEMINI_CMD`: 기본값 `gemini`
+- `PIUROFORGE_GEMINI_TIMEOUT_SECS`: 기본값 `120`
+- `PIUROFORGE_CLAUDE_CODE_CMD`: 기본값 `claude`
+- `PIUROFORGE_CLAUDE_CODE_TIMEOUT_SECS`: 기본값 `120`
 - `PIUROFORGE_ALLOW_DUMMY`: 기본값 `false`
 - `PIUROFORGE_LOG_PROMPTS`: 기본값 `false`, `true`면 prompt/response 로그를 `.novel/logs/llm_prompts/`에 저장
 - `PIUROFORGE_WORKSPACE_AUTO_COMMIT`: 기본값 `false`, `true`면 workspace Git repo를 자동 초기화하고 변경 명령마다 auto-commit
@@ -376,8 +385,8 @@ cargo run -- --workspace ~/novels/my-first-novel next-scene
 - `PIUROFORGE_REPO`: install script 기본값 `piuro-works/piuroforge`
 - `PIUROFORGE_DOWNLOAD_URL`: install script 테스트/override용 직접 자산 URL
 
-`PIUROFORGE_ALLOW_DUMMY=false`로 두면 codex CLI가 없거나 로그인되지 않았을 때 명확한 에러를 반환한다.
-`PIUROFORGE_CODEX_TIMEOUT_SECS`로 실제 codex 응답 대기 시간을 조절할 수 있다.
+`PIUROFORGE_ALLOW_DUMMY=false`로 두면 선택된 backend CLI가 없거나 로그인되지 않았을 때 명확한 에러를 반환한다.
+각 backend의 `*_TIMEOUT_SECS`로 실제 LLM 응답 대기 시간을 조절할 수 있다.
 환경 변수 우선순위는 전역 설정 파일보다 높다.
 
 ## 현재 제공 범위

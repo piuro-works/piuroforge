@@ -1,8 +1,10 @@
 pub mod agents;
+pub mod claude_code_runner;
 pub mod codex_runner;
 pub mod commands;
 pub mod config;
 pub mod engine;
+pub mod gemini_runner;
 pub mod launch_contract;
 pub mod llm_runner;
 pub mod memory_manager;
@@ -12,6 +14,7 @@ pub mod output;
 pub mod prompts;
 pub mod state_manager;
 pub mod story_foundation;
+pub(crate) mod subprocess;
 pub mod utils;
 mod workspace_git;
 mod workspace_scaffold;

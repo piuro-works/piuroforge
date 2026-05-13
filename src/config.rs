@@ -4,7 +4,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 
 pub const DEFAULT_LLM_BACKEND: &str = "codex_cli";
-pub const SUPPORTED_LLM_BACKENDS: &[&str] = &[DEFAULT_LLM_BACKEND];
+pub const SUPPORTED_LLM_BACKENDS: &[&str] = &["codex_cli", "gemini_cli", "claude_code"];
 
 pub const WORKSPACE_DIR_NAME: &str = ".novel";
 pub const WORKSPACE_MANIFEST_FILE: &str = "workspace.json";
@@ -36,6 +36,10 @@ pub struct Config {
     pub llm_backend: String,
     pub codex_command: String,
     pub codex_timeout_secs: u64,
+    pub gemini_command: String,
+    pub gemini_timeout_secs: u64,
+    pub claude_code_command: String,
+    pub claude_code_timeout_secs: u64,
 }
 
 impl Config {
@@ -104,10 +108,19 @@ impl Config {
             codex_timeout_secs: env_u64("PIUROFORGE_CODEX_TIMEOUT_SECS")
                 .or_else(|| env_u64("NOVEL_ENGINE_CODEX_TIMEOUT_SECS"))
                 .unwrap_or(global_settings.codex_timeout_secs),
+            gemini_command: env::var("PIUROFORGE_GEMINI_CMD")
+                .unwrap_or_else(|_| global_settings.gemini_command.clone()),
+            gemini_timeout_secs: env_u64("PIUROFORGE_GEMINI_TIMEOUT_SECS")
+                .unwrap_or(global_settings.gemini_timeout_secs),
+            claude_code_command: env::var("PIUROFORGE_CLAUDE_CODE_CMD")
+                .unwrap_or_else(|_| global_settings.claude_code_command.clone()),
+            claude_code_timeout_secs: env_u64("PIUROFORGE_CLAUDE_CODE_TIMEOUT_SECS")
+                .unwrap_or(global_settings.claude_code_timeout_secs),
             global_settings,
             novel_settings,
         })
     }
+
 
     pub fn workspace_name(&self) -> String {
         self.workspace_dir
@@ -127,20 +140,27 @@ impl Config {
             "# PiuroForge global settings\n\
 #\n\
 # First run for writers:\n\
-# 1. Open a terminal once and run: codex login\n\
-# 2. Keep llm_backend = \"codex_cli\" unless you intentionally install a custom PiuroForge backend build later\n\
+# 1. Pick an LLM backend below (default: codex_cli). Supported: codex_cli, gemini_cli, claude_code\n\
+# 2. Log in to the matching CLI once:\n\
+#      - codex_cli   -> `codex login`\n\
+#      - gemini_cli  -> first `gemini` run completes Google OAuth in your browser\n\
+#      - claude_code -> `claude login` (or `/login` inside `claude`)\n\
 # 3. Leave allow_dummy_fallback = false for real drafting\n\
 # 4. Turn allow_dummy_fallback = true on only if you intentionally want placeholder text for workflow testing\n\
 # 5. Turn workspace_auto_commit = true on if you want Git history created automatically inside each novel workspace\n\
 #\n\
 # If PiuroForge shows `codex_unavailable`, the usual causes are:\n\
-# - codex login has not been completed yet\n\
-# - this machine cannot reach the Codex service because of internet, DNS, VPN, or proxy issues\n\
+# - the selected backend's CLI has not been logged in yet\n\
+# - this machine cannot reach the backend service because of internet, DNS, VPN, or proxy issues\n\
 \n\
 version = {version}\n\
 llm_backend = {llm_backend:?}\n\
 codex_command = {codex_command:?}\n\
 codex_timeout_secs = {codex_timeout_secs}\n\
+gemini_command = {gemini_command:?}\n\
+gemini_timeout_secs = {gemini_timeout_secs}\n\
+claude_code_command = {claude_code_command:?}\n\
+claude_code_timeout_secs = {claude_code_timeout_secs}\n\
 allow_dummy_fallback = {allow_dummy_fallback}\n\
 log_prompts = {log_prompts}\n\
 workspace_auto_commit = {workspace_auto_commit}\n\
@@ -150,6 +170,10 @@ default_language = {default_language:?}\n\
             llm_backend = self.global_settings.llm_backend,
             codex_command = self.global_settings.codex_command,
             codex_timeout_secs = self.global_settings.codex_timeout_secs,
+            gemini_command = self.global_settings.gemini_command,
+            gemini_timeout_secs = self.global_settings.gemini_timeout_secs,
+            claude_code_command = self.global_settings.claude_code_command,
+            claude_code_timeout_secs = self.global_settings.claude_code_timeout_secs,
             allow_dummy_fallback = self.global_settings.allow_dummy_fallback,
             log_prompts = self.global_settings.log_prompts,
             workspace_auto_commit = self.global_settings.workspace_auto_commit,
@@ -223,6 +247,14 @@ pub struct GlobalSettings {
     pub codex_command: String,
     #[serde(default = "default_codex_timeout_secs")]
     pub codex_timeout_secs: u64,
+    #[serde(default = "default_gemini_command")]
+    pub gemini_command: String,
+    #[serde(default = "default_gemini_timeout_secs")]
+    pub gemini_timeout_secs: u64,
+    #[serde(default = "default_claude_code_command")]
+    pub claude_code_command: String,
+    #[serde(default = "default_claude_code_timeout_secs")]
+    pub claude_code_timeout_secs: u64,
     #[serde(default = "default_allow_dummy_fallback")]
     pub allow_dummy_fallback: bool,
     #[serde(default = "default_log_prompts")]
@@ -242,6 +274,10 @@ impl Default for GlobalSettings {
             llm_backend: default_llm_backend(),
             codex_command: default_codex_command(),
             codex_timeout_secs: default_codex_timeout_secs(),
+            gemini_command: default_gemini_command(),
+            gemini_timeout_secs: default_gemini_timeout_secs(),
+            claude_code_command: default_claude_code_command(),
+            claude_code_timeout_secs: default_claude_code_timeout_secs(),
             allow_dummy_fallback: default_allow_dummy_fallback(),
             log_prompts: default_log_prompts(),
             workspace_auto_commit: default_workspace_auto_commit(),
@@ -447,11 +483,27 @@ fn default_codex_command() -> String {
     "codex".to_string()
 }
 
+fn default_gemini_command() -> String {
+    "gemini".to_string()
+}
+
+fn default_claude_code_command() -> String {
+    "claude".to_string()
+}
+
 fn default_llm_backend() -> String {
     DEFAULT_LLM_BACKEND.to_string()
 }
 
 fn default_codex_timeout_secs() -> u64 {
+    120
+}
+
+fn default_gemini_timeout_secs() -> u64 {
+    120
+}
+
+fn default_claude_code_timeout_secs() -> u64 {
     120
 }
 

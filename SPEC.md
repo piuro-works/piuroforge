@@ -7,14 +7,14 @@ Rust로 구현된 CLI-first AI 소설 작성 프레임워크를 제공한다. �
 ## Non-Negotiable Constraints
 
 - 웹 UI는 만들지 않는다.
-- OpenAI API를 직접 호출하지 않는다.
+- OpenAI/Anthropic/Google API를 직접 호출하지 않는다.
 - API 키 기반 구현을 추가하지 않는다.
 - OAuth 토큰을 직접 처리하지 않는다.
-- LLM 호출은 사용자가 미리 로그인한 `codex` CLI subprocess만 사용한다.
+- LLM 호출은 사용자가 미리 로그인한 CLI subprocess만 사용한다. 로그인은 각 backend CLI 본인의 인증 흐름에 위임한다.
 - 기본 auth mode는 `codex_cli`이며, setup flow는 `init -> doctor -> next-scene`이다.
-- 현재 공식 런타임 backend는 `codex_cli` 하나만 지원한다.
-- 전역 설정 `llm_backend`는 존재해야 하며, 현재 허용값은 `codex_cli`다.
-- 향후 다른 CLI LLM backend를 추가하더라도 사용자-facing setup flow는 유지하고, 내부 `PromptRunner` 경계 뒤에서만 확장한다.
+- 현재 공식 런타임 backend는 `codex_cli`(기본), `gemini_cli`, `claude_code` 세 가지다.
+- 전역 설정 `llm_backend`는 존재해야 하며, 허용값은 `codex_cli`, `gemini_cli`, `claude_code`다.
+- 새로운 CLI LLM backend를 추가하더라도 사용자-facing setup flow는 유지하고, 내부 `PromptRunner` 경계 뒤에서만 확장한다.
 - 워크스페이스 정책은 `1 workspace = 1 novel`이다.
 - 엔진 프로젝트 Git과 소설 워크스페이스 Git은 분리한다.
 
@@ -95,15 +95,18 @@ Rust로 구현된 CLI-first AI 소설 작성 프레임워크를 제공한다. �
 - `PromptRunner`
 - `CliNovelBackend`
 - `CodexRunner`
+- `GeminiRunner`
+- `ClaudeCodeRunner`
 - `NovelEngine`
 - `CLI commands`
 
 ## Backend Extension Contract
 
 - `Planner`, `Writer`, `Editor`, `Critic`는 concrete CLI 구현이 아니라 `PromptRunner` 경계를 통해 호출한다.
-- 기본 구현은 `CodexRunner`이지만, 다른 CLI LLM backend도 같은 경계를 구현해 연결할 수 있다.
+- 공식 runner 구현은 `CodexRunner`, `GeminiRunner`, `ClaudeCodeRunner`다. backend 선택은 `Config::llm_backend` 값에 따라 `NovelEngine::new`에서 한 번 dispatch 된다.
 - 새로운 backend를 추가할 때는 planner/writer/editor/critic/rewrite/world expansion 흐름을 fake runner 기반 통합 테스트로 검증해야 한다.
 - backend 추가가 사용자 명령, workspace 구조, setup flow를 바꾸면 안 된다.
+- 각 runner는 subprocess timeout과 healthcheck를 책임진다. `codex_cli`는 JSON 진행 이벤트 파싱과 1회 재시도를 포함하며, `gemini_cli`/`claude_code`는 단순 stdout 캡처(재시도 없음, 진행 표시 없음)다.
 
 ## Data Models
 
@@ -284,9 +287,9 @@ Compiled from ...
   - `expand-world`
 - auto-commit 실패가 본 명령 자체를 실패시키면 안 된다. 본 작업 결과는 유지하고 warning으로만 드러내야 한다.
 
-실패 시 에러 메시지에는 반드시 `먼저 codex login 실행` 문구가 포함되어야 한다.
-기본 설정에서는 codex 실패가 dummy output으로 자동 대체되면 안 된다.
-실패 시 `run_prompt`는 1회 재시도한다.
+선택된 backend의 실패 메시지에는 해당 backend의 로그인 안내(`codex login`, `gemini`, `claude login`)가 포함되어야 한다.
+기본 설정에서는 backend 실패가 dummy output으로 자동 대체되면 안 된다.
+`codex_cli` runner는 실패 시 `run_prompt`를 1회 재시도한다. `gemini_cli`/`claude_code` runner는 단일 시도만 수행한다.
 응답이 지정된 timeout 안에 오지 않으면 subprocess를 종료하고 timeout 에러를 반환해야 한다.
 
 ## Test Floor
